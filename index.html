@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Control de Gastos — Cafetería</title>
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,-apple-system,sans-serif;background:#f5f0eb;color:#1a1208;min-height:100vh}
@@ -16,9 +19,13 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f5f0eb;color:#1a
 .tab{padding:6px 14px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:transparent;color:#e0d0c0;cursor:pointer;font-size:13px;font-family:inherit}
 .tab.active{background:#fff;color:#2c1810;font-weight:500}
 .tab:hover:not(.active){background:rgba(255,255,255,.1)}
-.btn-settings{border:1px solid rgba(255,255,255,.25);background:transparent;color:#c4a88a;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:13px;font-family:inherit;white-space:nowrap}
-.btn-settings:hover{background:rgba(255,255,255,.1);color:#fff}
-.btn-settings.configured{color:#7ecf7e;border-color:rgba(126,207,126,.4)}
+.btn-topbar{border:1px solid rgba(255,255,255,.25);background:transparent;color:#c4a88a;border-radius:8px;padding:5px 11px;cursor:pointer;font-size:13px;font-family:inherit;white-space:nowrap;display:flex;align-items:center;gap:5px}
+.btn-topbar:hover{background:rgba(255,255,255,.1);color:#fff}
+.sync-dot{width:8px;height:8px;border-radius:50%;background:#aaa;display:inline-block;flex-shrink:0}
+.sync-dot.green{background:#5ecf5e}
+.sync-dot.yellow{background:#f5c842;animation:pulse .8s ease-in-out infinite}
+.sync-dot.red{background:#e05050}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 
 .panel{display:none}.panel.active{display:block}
 
@@ -113,8 +120,21 @@ table.prod-tbl tr:last-child td{border-bottom:none}
 .form-input:focus,.form-select:focus,.form-textarea:focus{outline:none;border-color:#c8712f}
 .form-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 
-/* Photo & AI section */
-.photo-wrap{border:2px dashed #e0d8d0;border-radius:8px;padding:1.25rem;text-align:center;cursor:pointer;color:#7a6e65;font-size:13px;position:relative;overflow:hidden;transition:border-color .2s,color .2s}
+.stabs{display:flex;gap:4px;margin-bottom:1.25rem;border-bottom:2px solid #f0ebe4;padding-bottom:.75rem}
+.stab{padding:6px 14px;border-radius:8px;border:none;background:transparent;cursor:pointer;font-size:13px;font-family:inherit;color:#7a6e65}
+.stab.active{background:#f5f0eb;color:#2c1810;font-weight:500}
+.stab-panel{display:none}.stab-panel.active{display:block}
+
+.info-box{background:#f5f0eb;border-radius:8px;padding:.85rem;margin-bottom:1rem;font-size:13px;line-height:1.7;color:#4a3828}
+.info-box a{color:#c8712f;font-weight:500}
+.info-box code{background:#e0d8d0;padding:1px 5px;border-radius:4px;font-size:12px;word-break:break-all}
+.sync-status-bar{padding:.6rem .85rem;border-radius:8px;font-size:12px;margin-bottom:.85rem;display:none;align-items:center;gap:8px}
+.sync-status-bar.show{display:flex}
+.sync-status-bar.ok{background:#e8f3e0;color:#2e6010;border:1px solid #c5e0b0}
+.sync-status-bar.err{background:#fcebeb;color:#a32d2d;border:1px solid #f5c0c0}
+.sync-status-bar.warn{background:#faeeda;color:#854f0b;border:1px solid #f0d090}
+
+.photo-wrap{border:2px dashed #e0d8d0;border-radius:8px;padding:1.25rem;text-align:center;cursor:pointer;color:#7a6e65;font-size:13px;position:relative;overflow:hidden;transition:border-color .2s}
 .photo-wrap:hover{border-color:#c8712f;color:#c8712f;background:#fdf9f5}
 .photo-wrap input[type=file]{position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:0}
 .photo-preview-img{max-width:100%;max-height:160px;border-radius:6px;margin-top:.75rem;display:none;pointer-events:none}
@@ -152,17 +172,12 @@ table.inf-tbl th{padding:5px 12px;font-size:10px;color:#7a6e65;font-weight:600;t
 table.inf-tbl th:not(:first-child){text-align:right}
 table.inf-tbl td{padding:7px 12px;border-bottom:1px solid #f5f0eb}
 table.inf-tbl td:not(:first-child){text-align:right}
-table.inf-tbl tr.sup-row>td{font-weight:600;background:#f7f4f0;color:#2c1810;padding-left:14px}
+table.inf-tbl tr.sup-row>td{font-weight:600;background:#f7f4f0;padding-left:14px}
 table.inf-tbl tr.prod-row>td:first-child{padding-left:28px;color:#444}
 table.inf-tbl tr:last-child td{border-bottom:none}
 .grand-card{background:#2c1810;color:#fff;border-radius:10px;padding:1.25rem 1.5rem;display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:12px;margin-top:1rem}
 .gc-label{font-size:11px;color:#c4a88a;margin-bottom:4px}
 .gc-val{font-size:22px;font-weight:700}
-
-/* Settings modal */
-.api-key-info{background:#f5f0eb;border-radius:8px;padding:.85rem;margin-bottom:1rem;font-size:13px;line-height:1.7;color:#4a3828}
-.api-key-info a{color:#c8712f;font-weight:500}
-.api-key-info code{background:#e0d8d0;padding:1px 5px;border-radius:4px;font-size:12px}
 
 .empty{text-align:center;padding:3rem 1rem;color:#7a6e65}
 .empty-icon{font-size:40px;margin-bottom:.75rem}
@@ -201,7 +216,10 @@ table.inf-tbl tr:last-child td{border-bottom:none}
       <button class="tab" onclick="showTab('grupos')">&#128230; Por Grupos</button>
       <button class="tab" onclick="showTab('informes')">&#128200; Informes</button>
     </div>
-    <button class="btn-settings" id="btn-settings" onclick="openSettings()" title="Configurar IA">&#129302; IA</button>
+    <button class="btn-topbar" id="btn-sync" onclick="openSettings()" title="Sin sincronización">
+      <span class="sync-dot" id="sync-dot"></span> Nube
+    </button>
+    <button class="btn-topbar" id="btn-settings" onclick="openSettings()" title="Configuración">&#9881;&#65039; Config</button>
   </div>
 </div>
 
@@ -261,26 +279,19 @@ table.inf-tbl tr:last-child td{border-bottom:none}
       <button class="modal-close" onclick="closeModal('modal-factura')">&#10005;</button>
     </div>
     <div class="modal-body">
-
-      <!-- FOTO + IA -->
       <div class="photo-wrap" id="photo-wrap">
         <div id="photo-text">&#128247; Toca aquí para fotografiar la factura&nbsp;<span style="font-size:11px;opacity:.6">(opcional)</span></div>
         <img id="photo-prev" class="photo-preview-img" alt="Factura">
         <input type="file" id="photo-input" accept="image/*" capture="environment" onchange="handlePhoto(event)">
       </div>
-
       <div class="ai-section" id="ai-section">
         <button class="btn-ai" id="btn-ai" onclick="analyzeInvoice()">
           <span>&#10024;</span> Analizar factura con IA
         </button>
-        <div class="ai-loading" id="ai-loading">
-          <span class="ai-spinner"></span> Leyendo factura con Claude…
-        </div>
+        <div class="ai-loading" id="ai-loading"><span class="ai-spinner"></span> Leyendo factura con Claude…</div>
         <div class="ai-result" id="ai-result"></div>
       </div>
-
       <div style="height:.85rem"></div>
-
       <div class="form-grid-2">
         <div class="form-row">
           <label class="form-label">Fecha</label>
@@ -288,9 +299,7 @@ table.inf-tbl tr:last-child td{border-bottom:none}
         </div>
         <div class="form-row">
           <label class="form-label">Categoría de gasto</label>
-          <select id="inv-cat" class="form-select" onchange="onCatChange()">
-            <option value="">-- Selecciona --</option>
-          </select>
+          <select id="inv-cat" class="form-select" onchange="onCatChange()"><option value="">-- Selecciona --</option></select>
         </div>
       </div>
       <div class="form-row">
@@ -303,26 +312,21 @@ table.inf-tbl tr:last-child td{border-bottom:none}
         <label class="form-label">Nombre del nuevo proveedor</label>
         <input type="text" id="new-sup-name" class="form-input" placeholder="Ej: Distribuidora García">
       </div>
-
       <div class="form-row">
         <label class="form-label">Líneas de la factura</label>
         <div class="lines-wrap">
-          <div class="lines-header">
-            <span>Producto</span><span>Ud.</span><span>Cantidad</span><span>Precio ud.</span><span></span>
-          </div>
+          <div class="lines-header"><span>Producto</span><span>Ud.</span><span>Cantidad</span><span>Precio ud.</span><span></span></div>
           <div id="invoice-lines"></div>
         </div>
         <button class="btn-ghost" style="margin-top:7px;width:100%;font-size:12px" onclick="addLine()">+ Añadir línea</button>
       </div>
-
       <div class="inv-total-row">
         <span class="inv-total-lbl">Total factura</span>
         <span class="inv-total-val" id="inv-total-disp">0,00€</span>
       </div>
-
       <div class="form-row" style="margin-top:.85rem">
-        <label class="form-label">Notas <span style="font-weight:400;text-transform:none;font-size:11px">(nº factura, observaciones…)</span></label>
-        <textarea id="inv-notes" class="form-textarea" rows="2" placeholder="Opcional"></textarea>
+        <label class="form-label">Notas</label>
+        <textarea id="inv-notes" class="form-textarea" rows="2" placeholder="Nº factura, observaciones…"></textarea>
       </div>
     </div>
     <div class="modal-foot">
@@ -340,9 +344,6 @@ table.inf-tbl tr:last-child td{border-bottom:none}
       <button class="modal-close" onclick="closeModal('modal-consumo')">&#10005;</button>
     </div>
     <div class="modal-body">
-      <div style="background:#f5f0eb;border-radius:8px;padding:.7rem .85rem;margin-bottom:.85rem;font-size:13px;color:#7a6e65">
-        Anota aquí la cantidad consumida/usada de este producto.
-      </div>
       <div class="form-grid-2">
         <div class="form-row">
           <label class="form-label">Fecha</label>
@@ -361,7 +362,7 @@ table.inf-tbl tr:last-child td{border-bottom:none}
     </div>
     <div class="modal-foot">
       <button class="btn-ghost" onclick="closeModal('modal-consumo')">Cancelar</button>
-      <button class="btn-primary" onclick="saveConsumo()">Guardar consumo</button>
+      <button class="btn-primary" onclick="saveConsumo()">Guardar</button>
     </div>
   </div>
 </div>
@@ -374,58 +375,77 @@ table.inf-tbl tr:last-child td{border-bottom:none}
       <button class="modal-close" onclick="closeModal('modal-cat')">&#10005;</button>
     </div>
     <div class="modal-body">
-      <div class="form-row">
-        <label class="form-label">Nombre</label>
-        <input type="text" id="cat-name" class="form-input" placeholder="Ej: Panaderaía">
-      </div>
+      <div class="form-row"><label class="form-label">Nombre</label><input type="text" id="cat-name" class="form-input" placeholder="Ej: Panaderaía"></div>
       <div class="form-grid-2">
-        <div class="form-row">
-          <label class="form-label">Emoji / Icono</label>
-          <input type="text" id="cat-icon" class="form-input" placeholder="&#127838;" maxlength="2">
-        </div>
-        <div class="form-row">
-          <label class="form-label">Color</label>
-          <input type="color" id="cat-color" class="form-input" value="#c8712f" style="height:38px;padding:3px 6px;cursor:pointer">
-        </div>
+        <div class="form-row"><label class="form-label">Emoji</label><input type="text" id="cat-icon" class="form-input" placeholder="&#127838;" maxlength="2"></div>
+        <div class="form-row"><label class="form-label">Color</label><input type="color" id="cat-color" class="form-input" value="#c8712f" style="height:38px;padding:3px 6px;cursor:pointer"></div>
       </div>
     </div>
     <div class="modal-foot">
       <button class="btn-ghost" onclick="closeModal('modal-cat')">Cancelar</button>
-      <button class="btn-primary" onclick="saveCategoria()">Crear categoría</button>
+      <button class="btn-primary" onclick="saveCategoria()">Crear</button>
     </div>
   </div>
 </div>
 
-<!-- MODAL CONFIGURACIÓN IA -->
+<!-- MODAL CONFIGURACIÓN -->
 <div class="modal-overlay" id="modal-settings">
-  <div class="modal" style="max-width:480px">
+  <div class="modal" style="max-width:540px">
     <div class="modal-head">
-      <span class="modal-title">&#129302; Configuración de IA</span>
+      <span class="modal-title">&#9881;&#65039; Configuración</span>
       <button class="modal-close" onclick="closeModal('modal-settings')">&#10005;</button>
     </div>
     <div class="modal-body">
-      <div class="api-key-info">
-        Para que la IA lea tus facturas automáticamente necesitas una
-        <strong>clave API de Anthropic (Claude)</strong>.<br>
-        <br>
-        1️⃣ Crea una cuenta en <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a><br>
-        2️⃣ Ve a <strong>API Keys</strong> y crea una nueva<br>
-        3️⃣ Pégala aquí abajo y pulsa Guardar<br>
-        <br>
-        <span style="font-size:12px;color:#7a6e65">
-          🔒 La clave se guarda <strong>solo en este dispositivo</strong>, nunca en ningún servidor.
-          Cada análisis consume pequeños créditos de tu cuenta Anthropic (menos de 0,01€ por factura).
-        </span>
+      <div class="stabs">
+        <button class="stab active" onclick="switchStab('ia')">&#129302; Análisis IA</button>
+        <button class="stab" onclick="switchStab('sync')">&#9729;&#65039; Sincronización</button>
       </div>
-      <div class="form-row">
-        <label class="form-label">Clave API de Claude (empieza por <code>sk-ant-</code>)</label>
-        <input type="password" id="settings-key" class="form-input" placeholder="sk-ant-api03-..." autocomplete="off">
+
+      <!-- Tab IA -->
+      <div class="stab-panel active" id="stab-ia">
+        <div class="info-box">
+          Para que la IA lea tus facturas automáticamente necesitas una <strong>clave API de Anthropic</strong>.<br>
+          1️⃣ Crea cuenta en <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a><br>
+          2️⃣ Ve a <strong>API Keys</strong> → crea una clave nueva<br>
+          3️⃣ Pégala aquí y guarda<br>
+          <span style="font-size:12px;color:#7a6e65">🔒 Se guarda solo en este dispositivo. Cada análisis cuesta menos de 0,01€.</span>
+        </div>
+        <div class="form-row">
+          <label class="form-label">Clave API de Claude</label>
+          <input type="password" id="ia-key" class="form-input" placeholder="sk-ant-api03-…" autocomplete="off">
+        </div>
+        <div id="ia-status" style="font-size:12px;color:#2e6010;display:none;margin-top:-.4rem;padding:.4rem .2rem">✅ Clave configurada — la IA está lista.</div>
       </div>
-      <div id="settings-status" style="font-size:12px;margin-top:-.4rem;padding:.5rem .25rem;display:none"></div>
+
+      <!-- Tab Sync -->
+      <div class="stab-panel" id="stab-sync">
+        <div id="sync-current-bar" class="sync-status-bar"></div>
+        <div class="info-box">
+          Con <strong>Firebase</strong> (gratis) todos los dispositivos que accedan a la web comparten los mismos datos en tiempo real.<br><br>
+          <strong>Cómo configurarlo:</strong><br>
+          1️⃣ Ve a <a href="https://console.firebase.google.com" target="_blank">console.firebase.google.com</a> → Crear proyecto<br>
+          2️⃣ Añadir app web → Registrar → Copia el objeto <code>firebaseConfig</code><br>
+          3️⃣ Ve a <strong>Firestore Database</strong> → Crear base de datos → Modo de prueba<br>
+          4️⃣ Pega el JSON de configuración aquí abajo<br><br>
+          <span style="font-size:12px;color:#7a6e65">📸 Las <strong>fotos</strong> de facturas se guardan solo en el dispositivo donde se toman (no se sincronizan).</span>
+        </div>
+        <div class="form-row">
+          <label class="form-label">Firebase Config (JSON)</label>
+          <textarea id="fb-config-input" class="form-textarea" rows="6" placeholder='{
+  "apiKey": "AIzaSy...",
+  "authDomain": "mi-cafeteria.firebaseapp.com",
+  "projectId": "mi-cafeteria",
+  "storageBucket": "mi-cafeteria.appspot.com",
+  "messagingSenderId": "123456789",
+  "appId": "1:123456789:web:abc"
+}'></textarea>
+        </div>
+        <div id="fb-status" style="font-size:12px;display:none;margin-top:-.4rem;padding:.4rem .2rem"></div>
+        <button class="btn-ghost" style="font-size:12px;color:#a32d2d;border-color:#f5c0c0;margin-top:.25rem" onclick="clearFirebase()">Desconectar Firebase</button>
+      </div>
     </div>
     <div class="modal-foot">
-      <button class="btn-ghost" onclick="clearApiKey()" style="margin-right:auto;color:#a32d2d">Borrar clave</button>
-      <button class="btn-ghost" onclick="closeModal('modal-settings')">Cancelar</button>
+      <button class="btn-ghost" onclick="closeModal('modal-settings')">Cerrar</button>
       <button class="btn-primary" onclick="saveSettings()">Guardar</button>
     </div>
   </div>
@@ -435,20 +455,18 @@ table.inf-tbl tr:last-child td{border-bottom:none}
 <div class="modal-overlay" id="modal-view">
   <div class="modal">
     <div class="modal-head">
-      <span class="modal-title" id="view-title">Detalle de factura</span>
+      <span class="modal-title" id="view-title">Detalle</span>
       <button class="modal-close" onclick="closeModal('modal-view')">&#10005;</button>
     </div>
     <div class="modal-body" id="view-body"></div>
-    <div class="modal-foot">
-      <button class="btn-ghost" onclick="closeModal('modal-view')">Cerrar</button>
-    </div>
+    <div class="modal-foot"><button class="btn-ghost" onclick="closeModal('modal-view')">Cerrar</button></div>
   </div>
 </div>
 
 <datalist id="prod-dl"></datalist>
 
 <script>
-// ── Categorías por defecto ─────────────────────────────────────────────────────────
+// ── Categorías por defecto ───────────────────────────────────────────────────
 const DEF_CATS=[
   {id:'dc1',name:'Café y bebidas calientes',icon:'☕',color:'#6F4E37'},
   {id:'dc2',name:'Refrescos y agua',icon:'🥤',color:'#1565C0'},
@@ -460,48 +478,128 @@ const DEF_CATS=[
   {id:'dc8',name:'Otros gastos',icon:'📦',color:'#546E7A'},
 ];
 
-// ── Base de datos local ───────────────────────────────────────────────────────────
+// ── Estado global ──────────────────────────────────────────────────────────────
 let DB={categories:[],suppliers:[],products:[],invoices:[],consumptions:[],_nid:1};
+let db=null, fbUnsub=null, activeTab='resumen', lineN=0, photoDataUrl=null;
+let CY=new Date().getFullYear(), CM=new Date().getMonth();
+const MN=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
-function nid(){if(!DB._nid)DB._nid=1;return 'x'+(DB._nid++);}
-function save(){
+// ── IDs únicos (seguros en multi-dispositivo) ───────────────────────────────────────
+function nid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,8);}
+
+// ── Persistencia local ──────────────────────────────────────────────────────────
+function saveLocal(){
   try{localStorage.setItem('cafeteria_gastos',JSON.stringify(DB));}
-  catch(e){alert('Almacenamiento lleno. Elimina algunas facturas con foto para liberar espacio.');}
+  catch(e){alert('Almacenamiento lleno. Elimina facturas con foto para liberar espacio.');}
 }
-function load(){
+function loadLocal(){
   const raw=localStorage.getItem('cafeteria_gastos');
   if(raw){try{DB=JSON.parse(raw);if(!DB._nid)DB._nid=1;}catch(e){}}
-  else{DB.categories=DEF_CATS.map(c=>({...c}));save();}
+  else{DB.categories=DEF_CATS.map(c=>({...c}));saveLocal();}
 }
 
-// ── Navegación ───────────────────────────────────────────────────────────────────
-let CY=new Date().getFullYear(),CM=new Date().getMonth();
-const MN=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-let activeTab='resumen';
+// ── Firebase sync ─────────────────────────────────────────────────────────────
+function initFirebase(){
+  const cfgRaw=localStorage.getItem('fb_config');
+  if(!cfgRaw)return setSyncDot('off');
+  try{
+    const cfg=JSON.parse(cfgRaw);
+    if(!firebase.apps.length)firebase.initializeApp(cfg);
+    db=firebase.firestore();
+    setSyncDot('connecting');
+    startListener();
+  }catch(e){
+    console.error('Firebase init:',e);
+    setSyncDot('error');
+  }
+}
 
+function startListener(){
+  if(fbUnsub)fbUnsub();
+  fbUnsub=db.doc('cafeteria/main').onSnapshot(
+    snap=>{
+      if(snap.exists){
+        const remote=snap.data();
+        // preserve local photos
+        const photos={};
+        (DB.invoices||[]).forEach(inv=>{if(inv.photo)photos[inv.id]=inv.photo;});
+        DB={...remote};
+        if(!DB._nid)DB._nid=1;
+        DB.invoices=(DB.invoices||[]).map(inv=>({...inv,photo:photos[inv.id]||null}));
+        saveLocal();
+        setSyncDot('ok');
+        refreshCurrentTab();
+      }else{
+        // Primera vez: subir datos locales
+        pushToFirestore();
+      }
+    },
+    err=>{
+      console.error('Firestore:',err);
+      setSyncDot('error');
+    }
+  );
+}
+
+function pushToFirestore(){
+  if(!db)return;
+  const data=buildSyncData();
+  db.doc('cafeteria/main').set(data)
+    .then(()=>setSyncDot('ok'))
+    .catch(e=>{console.error(e);setSyncDot('error');});
+}
+
+function buildSyncData(){
+  return {
+    categories:DB.categories||[],
+    suppliers:DB.suppliers||[],
+    products:DB.products||[],
+    invoices:(DB.invoices||[]).map(({photo,...inv})=>inv), // sin fotos
+    consumptions:DB.consumptions||[],
+    _nid:DB._nid||1,
+    _updated:Date.now()
+  };
+}
+
+function save(){
+  saveLocal();
+  pushToFirestore();
+}
+
+function setSyncDot(state){
+  const dot=document.getElementById('sync-dot');
+  const btn=document.getElementById('btn-sync');
+  dot.className='sync-dot';
+  if(state==='ok'){dot.classList.add('green');btn.title='Sincronizado ✔';}
+  else if(state==='connecting'){dot.classList.add('yellow');btn.title='Conectando…';}
+  else if(state==='error'){dot.classList.add('red');btn.title='Error de sincronización';}
+  else{btn.title='Sin sincronización — datos solo en este dispositivo';}
+}
+
+// ── Navegación ──────────────────────────────────────────────────────────────────
 function changeMonth(d){
-  CM+=d;
-  if(CM>11){CM=0;CY++;}if(CM<0){CM=11;CY--;}
+  CM+=d;if(CM>11){CM=0;CY++;}if(CM<0){CM=11;CY--;}
   if(activeTab==='resumen')renderResumen();
   else if(activeTab==='informes')renderInformes();
 }
-
 function showTab(t){
   activeTab=t;
-  document.querySelectorAll('.tab').forEach((b,i)=>{
-    b.classList.toggle('active',['resumen','facturas','grupos','informes'][i]===t);
-  });
-  ['resumen','facturas','grupos','informes'].forEach(p=>{
-    document.getElementById('panel-'+p).classList.toggle('active',p===t);
-  });
+  document.querySelectorAll('.tab').forEach((b,i)=>b.classList.toggle('active',['resumen','facturas','grupos','informes'][i]===t));
+  ['resumen','facturas','grupos','informes'].forEach(p=>document.getElementById('panel-'+p).classList.toggle('active',p===t));
   if(t==='resumen')renderResumen();
   else if(t==='facturas')renderFacturas();
   else if(t==='grupos')renderGrupos();
   else if(t==='informes')renderInformes();
 }
+function refreshCurrentTab(){
+  if(activeTab==='resumen')renderResumen();
+  else if(activeTab==='facturas')renderFacturas();
+  else if(activeTab==='grupos')renderGrupos();
+  else if(activeTab==='informes')renderInformes();
+}
 
-// ── Utilidades ─────────────────────────────────────────────────────────────────────
-function fmt(n){return (+(n||0)).toFixed(2).replace('.',',')+'€';}
+// ── Utilidades ───────────────────────────────────────────────────────────────────
+function fmt(n){return(+(n||0)).toFixed(2).replace('.',',')+'€';}
 function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function getCat(id){return DB.categories.find(c=>c.id===id)||{name:'Sin categoría',icon:'📦',color:'#888'};}
 function getSup(id){return DB.suppliers.find(s=>s.id===id)||{name:'Proveedor desconocido'};}
@@ -538,11 +636,10 @@ function productConsumed(pid,filter){
 function productStock(pid){return productPurchased(pid)-productConsumed(pid);}
 function refreshDl(){document.getElementById('prod-dl').innerHTML=DB.products.map(p=>`<option value="${esc(p.name)}">`).join('');}
 
-// ── Render Resumen ──────────────────────────────────────────────────────────────
+// ── Render Resumen ────────────────────────────────────────────────────────────
 function renderResumen(){
-  const lbl=MN[CM]+' '+CY;
-  document.getElementById('month-label').textContent=lbl;
-  document.getElementById('topbar-sub').textContent='Resumen de '+lbl;
+  document.getElementById('month-label').textContent=MN[CM]+' '+CY;
+  document.getElementById('topbar-sub').textContent='Resumen de '+MN[CM]+' '+CY;
   const invs=invsByMonth(CM,CY);
   const total=invs.reduce((s,i)=>s+(i.total||0),0);
   const pm=CM===0?11:CM-1,py=CM===0?CY-1:CY;
@@ -551,38 +648,26 @@ function renderResumen(){
   const supSet=new Set(invs.map(i=>i.supId));
   const bycat={};
   invs.forEach(inv=>{bycat[inv.catId]=(bycat[inv.catId]||0)+(inv.total||0);});
-
   document.getElementById('metrics-wrap').innerHTML=`
-    <div class="metric"><div class="metric-label">Total gastado</div><div class="metric-val">${fmt(total)}</div>
-      <div class="metric-sub">${prevTotal>0?(diff>=0?'▲':'▼')+Math.abs(diff).toFixed(0)+'% vs mes ant.':'Primer mes registrado'}</div></div>
+    <div class="metric"><div class="metric-label">Total gastado</div><div class="metric-val">${fmt(total)}</div><div class="metric-sub">${prevTotal>0?(diff>=0?'▲':'▼')+Math.abs(diff).toFixed(0)+'% vs mes ant.':'Primer mes'}</div></div>
     <div class="metric"><div class="metric-label">Facturas</div><div class="metric-val">${invs.length}</div><div class="metric-sub">este mes</div></div>
     <div class="metric"><div class="metric-label">Proveedores</div><div class="metric-val">${supSet.size}</div><div class="metric-sub">activos</div></div>
     <div class="metric"><div class="metric-label">Categorías</div><div class="metric-val">${Object.keys(bycat).length}</div><div class="metric-sub">con gasto</div></div>`;
-
   const sorted=Object.entries(bycat).sort((a,b)=>b[1]-a[1]);
   const maxAmt=sorted.length?sorted[0][1]:1;
-  let barsHtml='';
-  if(!sorted.length)barsHtml='<div style="color:#7a6e65;font-size:13px">Sin gastos registrados este mes.</div>';
+  let barsHtml=sorted.length?'':'<div style="color:#7a6e65;font-size:13px">Sin gastos registrados este mes.</div>';
   sorted.forEach(([catId,amt])=>{
-    const cat=getCat(catId);
-    const pct=Math.round(amt/maxAmt*100);
-    barsHtml+=`<div class="cat-bar-row"><div class="cat-bar-icon">${cat.icon}</div><div class="cat-bar-info">
-      <div class="cat-bar-top"><span class="cat-bar-name">${esc(cat.name)}</span><span class="cat-bar-amt">${fmt(amt)}</span></div>
-      <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${cat.color}"></div></div>
-    </div></div>`;
+    const cat=getCat(catId),pct=Math.round(amt/maxAmt*100);
+    barsHtml+=`<div class="cat-bar-row"><div class="cat-bar-icon">${cat.icon}</div><div class="cat-bar-info"><div class="cat-bar-top"><span class="cat-bar-name">${esc(cat.name)}</span><span class="cat-bar-amt">${fmt(amt)}</span></div><div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${cat.color}"></div></div></div></div>`;
   });
   document.getElementById('cat-bars').innerHTML=barsHtml;
-  const recent=[...DB.invoices].sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,6);
-  buildInvTable('recent-wrap',recent);
+  buildInvTable('recent-wrap',[...DB.invoices].sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,6));
 }
 
-// ── Render Facturas ───────────────────────────────────────────────────────────
+// ── Render Facturas ──────────────────────────────────────────────────────────
 function renderFacturas(){
-  const mSel=document.getElementById('f-month');
-  const cSel=document.getElementById('f-cat');
-  const sSel=document.getElementById('f-sup');
-  const keys=allMonthKeys();
-  const selM=mSel.value||(monthKey(CM,CY));
+  const mSel=document.getElementById('f-month'),cSel=document.getElementById('f-cat'),sSel=document.getElementById('f-sup');
+  const keys=allMonthKeys(),selM=mSel.value||(monthKey(CM,CY));
   mSel.innerHTML='<option value="">Todos los meses</option>'+keys.map(k=>`<option value="${k}"${k===selM?' selected':''}>${monthLabel(k)}</option>`).join('');
   const selC=cSel.value||'';
   cSel.innerHTML='<option value="">Todas las categorías</option>'+DB.categories.map(c=>`<option value="${c.id}"${c.id===selC?' selected':''}>${c.icon} ${esc(c.name)}</option>`).join('');
@@ -599,20 +684,13 @@ function buildInvTable(id,invs){
   const el=document.getElementById(id);
   if(!invs.length){el.innerHTML='<div class="empty"><div class="empty-icon">🧣</div><div class="empty-text">No hay facturas</div><div class="empty-sub">Pulsa «+ Nueva factura» para añadir</div></div>';return;}
   el.innerHTML='<div class="invoice-table">'+invs.map(inv=>{
-    const d=new Date(inv.date+'T12:00:00');
-    const ds=d.toLocaleDateString('es-ES',{day:'2-digit',month:'short',year:'2-digit'});
+    const d=new Date(inv.date+'T12:00:00'),ds=d.toLocaleDateString('es-ES',{day:'2-digit',month:'short',year:'2-digit'});
     const cat=getCat(inv.catId),sup=getSup(inv.supId),nl=(inv.lines||[]).length;
-    return `<div class="inv-row" onclick="viewFactura('${inv.id}')">
-      <div class="inv-date">${ds}</div>
-      <div><div class="inv-supplier">${esc(sup.name)}</div><div class="inv-cat">${cat.icon} ${esc(cat.name)}</div></div>
-      <div class="inv-nlines">${nl} línea${nl!==1?'s':''}</div>
-      <div class="inv-total">${fmt(inv.total)}</div>
-      <button class="inv-del" onclick="event.stopPropagation();deleteFactura('${inv.id}')">✕</button>
-    </div>`;
+    return `<div class="inv-row" onclick="viewFactura('${inv.id}')"><div class="inv-date">${ds}</div><div><div class="inv-supplier">${esc(sup.name)}</div><div class="inv-cat">${cat.icon} ${esc(cat.name)}</div></div><div class="inv-nlines">${nl} línea${nl!==1?'s':''}</div><div class="inv-total">${fmt(inv.total)}</div><button class="inv-del" onclick="event.stopPropagation();deleteFactura('${inv.id}')">✕</button></div>`;
   }).join('')+'</div>';
 }
 
-// ── Render Grupos ────────────────────────────────────────────────────────────────
+// ── Render Grupos ───────────────────────────────────────────────────────────────
 function renderGrupos(){
   const wrap=document.getElementById('grupos-wrap');
   if(!DB.categories.length){wrap.innerHTML='<div class="empty"><div class="empty-icon">📦</div><div class="empty-text">Sin categorías</div></div>';return;}
@@ -624,33 +702,21 @@ function renderGrupos(){
     sups.forEach(sup=>{
       const prods=DB.products.filter(p=>p.supId===sup.id);
       const supTotal=DB.invoices.filter(i=>i.supId===sup.id).reduce((s,i)=>s+(i.total||0),0);
-      let prodRows=prods.length?
-        `<table class="prod-tbl"><thead><tr>
-          <th>Producto</th><th>Comprado (total)</th><th>Consumido (total)</th><th>Stock actual</th><th>Gastado total</th><th></th>
-        </tr></thead><tbody>`+prods.map(prod=>{
-          const pur=productPurchased(prod.id),con=productConsumed(prod.id),stk=pur-con,spt=productSpent(prod.id);
-          const u=prod.unit?' '+prod.unit:'';
+      const prodRows=prods.length?
+        `<table class="prod-tbl"><thead><tr><th>Producto</th><th>Comprado</th><th>Consumido</th><th>Stock actual</th><th>Gastado total</th><th></th></tr></thead><tbody>`+
+        prods.map(prod=>{
+          const pur=productPurchased(prod.id),con=productConsumed(prod.id),stk=pur-con,spt=productSpent(prod.id),u=prod.unit?' '+prod.unit:'';
           const cls=stk<=0?'tag-zero':pur>0&&stk<pur*0.15?'tag-low':'tag-ok';
-          const lbl=stk<=0?'Sin stock':pur>0&&stk<pur*0.15?'Poco':'OK';
-          return `<tr><td>${esc(prod.name)}</td><td>${pur.toFixed(2)}${u}</td><td>${con.toFixed(2)}${u}</td>
-            <td>${stk.toFixed(2)}${u} <span class="tag-stock ${cls}">${lbl}</span></td>
-            <td>${fmt(spt)}</td><td><button class="btn-consumo" onclick="openConsumo('${prod.id}')">+ Consumo</button></td></tr>`;
+          return `<tr><td>${esc(prod.name)}</td><td>${pur.toFixed(2)}${u}</td><td>${con.toFixed(2)}${u}</td><td>${stk.toFixed(2)}${u} <span class="tag-stock ${cls}">${stk<=0?'Sin stock':pur>0&&stk<pur*0.15?'Poco':'OK'}</span></td><td>${fmt(spt)}</td><td><button class="btn-consumo" onclick="openConsumo('${prod.id}')">+ Consumo</button></td></tr>`;
         }).join('')+'</tbody></table>'
-        :'<div style="padding:8px 12px 8px 32px;font-size:12px;color:#7a6e65">Sin productos — añade una factura de este proveedor.</div>';
-      supHtml+=`<div class="sup-section"><div class="sup-header" onclick="toggleEl('sb-${sup.id}','sc-${sup.id}')">
-        <div><div class="sup-name">🏪 ${esc(sup.name)}</div><div class="sup-meta">${prods.length} producto${prods.length!==1?'s':''}</div></div>
-        <div style="display:flex;align-items:center;gap:6px"><span class="sup-amount">${fmt(supTotal)}</span><span class="chevron" id="sc-${sup.id}">▼</span></div>
-      </div><div class="sup-body" id="sb-${sup.id}">${prodRows}</div></div>`;
+        :'<div style="padding:8px 12px 8px 32px;font-size:12px;color:#7a6e65">Añade una factura de este proveedor para ver el inventario.</div>';
+      supHtml+=`<div class="sup-section"><div class="sup-header" onclick="toggleEl('sb-${sup.id}','sc-${sup.id}')"><div><div class="sup-name">🏪 ${esc(sup.name)}</div><div class="sup-meta">${prods.length} producto${prods.length!==1?'s':''}</div></div><div style="display:flex;align-items:center;gap:6px"><span class="sup-amount">${fmt(supTotal)}</span><span class="chevron" id="sc-${sup.id}">▼</span></div></div><div class="sup-body" id="sb-${sup.id}">${prodRows}</div></div>`;
     });
     if(!supHtml)supHtml='<div style="padding:10px 14px;font-size:12px;color:#7a6e65">Sin proveedores. Añade una factura en esta categoría.</div>';
-    html+=`<div class="group-card"><div class="group-header" onclick="toggleEl('gb-${cat.id}','gc-${cat.id}')">
-      <div class="group-header-left"><span class="group-icon">${cat.icon}</span><span class="group-name">${esc(cat.name)}</span><span class="group-meta">${sups.length} proveedor${sups.length!==1?'es':''}</span></div>
-      <span class="group-amount">${fmt(catTotal)}</span><span class="chevron" id="gc-${cat.id}">▼</span>
-    </div><div class="group-body" id="gb-${cat.id}">${supHtml}</div></div>`;
+    html+=`<div class="group-card"><div class="group-header" onclick="toggleEl('gb-${cat.id}','gc-${cat.id}')"><div class="group-header-left"><span class="group-icon">${cat.icon}</span><span class="group-name">${esc(cat.name)}</span><span class="group-meta">${sups.length} prov.</span></div><span class="group-amount">${fmt(catTotal)}</span><span class="chevron" id="gc-${cat.id}">▼</span></div><div class="group-body" id="gb-${cat.id}">${supHtml}</div></div>`;
   });
   wrap.innerHTML=html;
 }
-
 function toggleEl(bId,cId){
   const b=document.getElementById(bId),c=document.getElementById(cId);
   if(!b)return;
@@ -658,56 +724,37 @@ function toggleEl(bId,cId){
   if(c)c.classList.toggle('open',open);
 }
 
-// ── Render Informes ───────────────────────────────────────────────────────────
+// ── Render Informes ──────────────────────────────────────────────────────────
 function renderInformes(){
-  const sel=document.getElementById('inf-month-sel');
-  const keys=allMonthKeys();
-  const selKey=sel.value||(monthKey(CM,CY));
+  const sel=document.getElementById('inf-month-sel'),keys=allMonthKeys(),selKey=sel.value||(monthKey(CM,CY));
   sel.innerHTML=keys.map(k=>`<option value="${k}"${k===selKey?' selected':''}>${monthLabel(k)}</option>`).join('');
   if(!sel.value)sel.value=selKey;
-  const[selY,selM]=selKey.split('-').map(Number);
-  const invs=invsByMonth(selM,selY);
+  const[selY,selM]=selKey.split('-').map(Number),invs=invsByMonth(selM,selY);
   let grandSpent=0,html='';
   DB.categories.forEach(cat=>{
-    const catInvs=invs.filter(i=>i.catId===cat.id);
-    if(!catInvs.length)return;
-    const catSpent=catInvs.reduce((s,i)=>s+(i.total||0),0);
-    grandSpent+=catSpent;
-    const supIds=[...new Set(catInvs.map(i=>i.supId))];
+    const catInvs=invs.filter(i=>i.catId===cat.id);if(!catInvs.length)return;
+    const catSpent=catInvs.reduce((s,i)=>s+(i.total||0),0);grandSpent+=catSpent;
     let rows='';
-    supIds.forEach(sid=>{
-      const sup=getSup(sid);
-      const supInvs=catInvs.filter(i=>i.supId===sid);
-      const supSpent=supInvs.reduce((s,i)=>s+(i.total||0),0);
-      rows+=`<tr class="sup-row"><td colspan="5">🏪 ${esc(sup.name)} — <span style="color:#c8712f">${fmt(supSpent)}</span></td></tr>`;
-      const prodMap={};
+    [...new Set(catInvs.map(i=>i.supId))].forEach(sid=>{
+      const sup=getSup(sid),supInvs=catInvs.filter(i=>i.supId===sid);
+      rows+=`<tr class="sup-row"><td colspan="5">🏪 ${esc(sup.name)} — <span style="color:#c8712f">${fmt(supInvs.reduce((s,i)=>s+(i.total||0),0))}</span></td></tr>`;
+      const pm={};
       supInvs.forEach(inv=>(inv.lines||[]).forEach(l=>{
-        if(!prodMap[l.productId])prodMap[l.productId]={name:l.productName,unit:l.unit||'',qty:0,spent:0};
-        prodMap[l.productId].qty+=l.qty||0;prodMap[l.productId].spent+=l.total||0;
+        if(!pm[l.productId])pm[l.productId]={name:l.productName,unit:l.unit||'',qty:0,spent:0};
+        pm[l.productId].qty+=l.qty||0;pm[l.productId].spent+=l.total||0;
       }));
-      Object.entries(prodMap).forEach(([pid,p])=>{
-        const conM=productConsumed(pid,{m:selM,y:selY}),stkAll=productStock(pid),u=p.unit?' '+p.unit:'';
-        rows+=`<tr class="prod-row"><td>${esc(p.name)}</td><td>${p.qty.toFixed(2)}${u}</td><td>${conM.toFixed(2)}${u}</td><td>${stkAll.toFixed(2)}${u}</td><td>${fmt(p.spent)}</td></tr>`;
+      Object.entries(pm).forEach(([pid,p])=>{
+        const con=productConsumed(pid,{m:selM,y:selY}),stk=productStock(pid),u=p.unit?' '+p.unit:'';
+        rows+=`<tr class="prod-row"><td>${esc(p.name)}</td><td>${p.qty.toFixed(2)}${u}</td><td>${con.toFixed(2)}${u}</td><td>${stk.toFixed(2)}${u}</td><td>${fmt(p.spent)}</td></tr>`;
       });
     });
-    html+=`<div class="inf-block"><div class="inf-block-head"><span class="inf-block-name">${cat.icon} ${esc(cat.name)}</span><span class="inf-block-total">${fmt(catSpent)}</span></div>
-      <table class="inf-tbl"><thead><tr><th>Producto</th><th>Comprado (mes)</th><th>Consumido (mes)</th><th>Stock actual</th><th>Gastado</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    html+=`<div class="inf-block"><div class="inf-block-head"><span class="inf-block-name">${cat.icon} ${esc(cat.name)}</span><span class="inf-block-total">${fmt(catSpent)}</span></div><table class="inf-tbl"><thead><tr><th>Producto</th><th>Comprado (mes)</th><th>Consumido (mes)</th><th>Stock actual</th><th>Gastado</th></tr></thead><tbody>${rows}</tbody></table></div>`;
   });
-  if(!html)html=`<div class="empty"><div class="empty-icon">📈</div><div class="empty-text">Sin datos para ${MN[selM]} ${selY}</div><div class="empty-sub">Añade facturas para ver el informe</div></div>`;
-  document.getElementById('informe-content').innerHTML=`
-    <div class="inf-header-row"><div class="inf-page-title">Informe mensual · ${MN[selM]} ${selY}</div></div>
-    ${html}
-    ${grandSpent>0?`<div class="grand-card">
-      <div><div class="gc-label">Total gastado</div><div class="gc-val">${fmt(grandSpent)}</div></div>
-      <div><div class="gc-label">Facturas</div><div class="gc-val">${invs.length}</div></div>
-      <div><div class="gc-label">Proveedores</div><div class="gc-val">${new Set(invs.map(i=>i.supId)).size}</div></div>
-      <div><div class="gc-label">Categorías</div><div class="gc-val">${new Set(invs.map(i=>i.catId)).size}</div></div>
-    </div>`:''}`;  
+  if(!html)html=`<div class="empty"><div class="empty-icon">📈</div><div class="empty-text">Sin datos para ${MN[selM]} ${selY}</div></div>`;
+  document.getElementById('informe-content').innerHTML=`<div class="inf-header-row"><div class="inf-page-title">Informe · ${MN[selM]} ${selY}</div></div>${html}${grandSpent>0?`<div class="grand-card"><div><div class="gc-label">Total gastado</div><div class="gc-val">${fmt(grandSpent)}</div></div><div><div class="gc-label">Facturas</div><div class="gc-val">${invs.length}</div></div><div><div class="gc-label">Proveedores</div><div class="gc-val">${new Set(invs.map(i=>i.supId)).size}</div></div></div>`:''}`;
 }
 
-// ── Modal Factura ───────────────────────────────────────────────────────────────
-let photoDataUrl=null,lineN=0;
-
+// ── Modal Factura ──────────────────────────────────────────────────────────────
 function openFacturaModal(){
   photoDataUrl=null;
   const prev=document.getElementById('photo-prev');
@@ -720,8 +767,7 @@ function openFacturaModal(){
   document.getElementById('btn-ai').disabled=false;
   document.getElementById('ai-result').style.display='none';
   document.getElementById('inv-date').value=new Date().toISOString().slice(0,10);
-  document.getElementById('inv-cat').innerHTML='<option value="">-- Selecciona --</option>'+
-    DB.categories.map(c=>`<option value="${c.id}">${c.icon} ${esc(c.name)}</option>`).join('');
+  document.getElementById('inv-cat').innerHTML='<option value="">-- Selecciona --</option>'+DB.categories.map(c=>`<option value="${c.id}">${c.icon} ${esc(c.name)}</option>`).join('');
   document.getElementById('inv-sup').innerHTML='<option value="">-- Selecciona categoría primero --</option><option value="__new__">+ Nuevo proveedor…</option>';
   document.getElementById('new-sup-row').style.display='none';
   document.getElementById('new-sup-name').value='';
@@ -733,78 +779,49 @@ function openFacturaModal(){
 }
 
 function handlePhoto(e){
-  const file=e.target.files&&e.target.files[0];
-  if(!file)return;
-  const reader=new FileReader();
-  reader.onload=ev=>{
-    const img=new Image();
-    img.onload=()=>{
-      const canvas=document.createElement('canvas');
-      const MAX=800,r=Math.min(MAX/img.width,MAX/img.height,1);
-      canvas.width=Math.round(img.width*r);canvas.height=Math.round(img.height*r);
-      canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
-      photoDataUrl=canvas.toDataURL('image/jpeg',0.82);
-      const p=document.getElementById('photo-prev');
-      p.src=photoDataUrl;p.style.display='block';
-      document.getElementById('photo-text').style.display='none';
-      // Show AI button
-      const aiSec=document.getElementById('ai-section');
-      aiSec.style.display='block';
-      document.getElementById('btn-ai').style.display='block';
-      document.getElementById('btn-ai').disabled=false;
-      document.getElementById('ai-loading').style.display='none';
-      document.getElementById('ai-result').style.display='none';
-    };
-    img.src=ev.target.result;
-  };
-  reader.readAsDataURL(file);
+  const file=e.target.files&&e.target.files[0];if(!file)return;
+  new Promise((res,rej)=>{const r=new FileReader();r.onload=ev=>res(ev.target.result);r.onerror=rej;r.readAsDataURL(file);})
+  .then(src=>new Promise((res)=>{const img=new Image();img.onload=()=>res(img);img.src=src;}))
+  .then(img=>{
+    const canvas=document.createElement('canvas'),MAX=800,r=Math.min(MAX/img.width,MAX/img.height,1);
+    canvas.width=Math.round(img.width*r);canvas.height=Math.round(img.height*r);
+    canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+    photoDataUrl=canvas.toDataURL('image/jpeg',.82);
+    const p=document.getElementById('photo-prev');p.src=photoDataUrl;p.style.display='block';
+    document.getElementById('photo-text').style.display='none';
+    document.getElementById('ai-section').style.display='block';
+    document.getElementById('btn-ai').style.display='block';
+    document.getElementById('btn-ai').disabled=false;
+    document.getElementById('ai-loading').style.display='none';
+    document.getElementById('ai-result').style.display='none';
+  });
 }
 
 function onCatChange(){
-  const catId=document.getElementById('inv-cat').value;
-  const sups=DB.suppliers.filter(s=>s.catId===catId);
-  document.getElementById('inv-sup').innerHTML=
-    '<option value="">-- Selecciona proveedor --</option>'+
-    sups.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join('')+
-    '<option value="__new__">+ Nuevo proveedor…</option>';
+  const catId=document.getElementById('inv-cat').value,sups=DB.suppliers.filter(s=>s.catId===catId);
+  document.getElementById('inv-sup').innerHTML='<option value="">-- Selecciona proveedor --</option>'+sups.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join('')+'<option value="__new__">+ Nuevo proveedor…</option>';
   document.getElementById('new-sup-row').style.display='none';
   document.getElementById('new-sup-name').value='';
 }
-
-function onSupChange(){
-  const v=document.getElementById('inv-sup').value;
-  document.getElementById('new-sup-row').style.display=v==='__new__'?'block':'none';
-}
+function onSupChange(){document.getElementById('new-sup-row').style.display=document.getElementById('inv-sup').value==='__new__'?'block':'none';}
 
 function addLine(){
   lineN++;
-  const lid='ln-'+lineN;
-  const div=document.createElement('div');
+  const lid='ln-'+lineN,div=document.createElement('div');
   div.className='line-row';div.id=lid;
-  div.innerHTML=`
-    <input list="prod-dl" class="line-input" placeholder="Nombre del producto" oninput="recalc()">
-    <input class="line-input" placeholder="kg" style="text-align:center">
-    <input type="number" class="line-input" placeholder="0" min="0" step="0.001" oninput="recalc()" style="text-align:right">
-    <input type="number" class="line-input" placeholder="0.00" min="0" step="0.01" oninput="recalc()" style="text-align:right">
-    <button class="line-del" onclick="document.getElementById('${lid}').remove();recalc()">×</button>`;
+  div.innerHTML=`<input list="prod-dl" class="line-input" placeholder="Nombre del producto" oninput="recalc()"><input class="line-input" placeholder="kg" style="text-align:center"><input type="number" class="line-input" placeholder="0" min="0" step="0.001" oninput="recalc()" style="text-align:right"><input type="number" class="line-input" placeholder="0.00" min="0" step="0.01" oninput="recalc()" style="text-align:right"><button class="line-del" onclick="document.getElementById('${lid}').remove();recalc()">×</button>`;
   document.getElementById('invoice-lines').appendChild(div);
 }
-
 function recalc(){
   let t=0;
-  document.querySelectorAll('#invoice-lines .line-row').forEach(r=>{
-    const ni=r.querySelectorAll('input[type=number]');
-    t+=(parseFloat(ni[0]&&ni[0].value||0)||0)*(parseFloat(ni[1]&&ni[1].value||0)||0);
-  });
+  document.querySelectorAll('#invoice-lines .line-row').forEach(r=>{const ni=r.querySelectorAll('input[type=number]');t+=(parseFloat(ni[0]&&ni[0].value||0)||0)*(parseFloat(ni[1]&&ni[1].value||0)||0);});
   document.getElementById('inv-total-disp').textContent=t.toFixed(2).replace('.',',')+'€';
 }
 
 function saveFactura(){
-  const date=document.getElementById('inv-date').value;
-  const catId=document.getElementById('inv-cat').value;
+  const date=document.getElementById('inv-date').value,catId=document.getElementById('inv-cat').value;
   let supId=document.getElementById('inv-sup').value;
-  const newSupName=document.getElementById('new-sup-name').value.trim();
-  const notes=document.getElementById('inv-notes').value.trim();
+  const newSupName=document.getElementById('new-sup-name').value.trim(),notes=document.getElementById('inv-notes').value.trim();
   if(!date)return alert('Selecciona una fecha.');
   if(!catId)return alert('Selecciona una categoría.');
   if(supId==='__new__'){
@@ -815,12 +832,9 @@ function saveFactura(){
   if(!supId)return alert('Selecciona o crea un proveedor.');
   const lines=[];let total=0;
   document.querySelectorAll('#invoice-lines .line-row').forEach(r=>{
-    const inp=r.querySelectorAll('input');
-    const name=(inp[0]&&inp[0].value||'').trim();if(!name)return;
-    const unit=(inp[1]&&inp[1].value||'').trim();
-    const qty=parseFloat(inp[2]&&inp[2].value||0)||0;
-    const unitPrice=parseFloat(inp[3]&&inp[3].value||0)||0;
-    const lineTotal=qty*unitPrice;total+=lineTotal;
+    const inp=r.querySelectorAll('input'),name=(inp[0]&&inp[0].value||'').trim();if(!name)return;
+    const unit=(inp[1]&&inp[1].value||'').trim(),qty=parseFloat(inp[2]&&inp[2].value||0)||0,unitPrice=parseFloat(inp[3]&&inp[3].value||0)||0,lineTotal=qty*unitPrice;
+    total+=lineTotal;
     let prod=DB.products.find(p=>p.name.toLowerCase()===name.toLowerCase()&&p.supId===supId);
     if(!prod){prod={id:nid(),name,supId,catId,unit};DB.products.push(prod);}
     else if(unit&&!prod.unit)prod.unit=unit;
@@ -829,140 +843,49 @@ function saveFactura(){
   if(!lines.length)return alert('Añade al menos un producto.');
   DB.invoices.push({id:nid(),date,catId,supId,lines,total,notes,photo:photoDataUrl,createdAt:new Date().toISOString()});
   save();refreshDl();closeModal('modal-factura');
-  if(activeTab==='resumen')renderResumen();
-  else if(activeTab==='facturas')renderFacturas();
-  else renderGrupos();
+  refreshCurrentTab();
   if(activeTab!=='grupos')renderGrupos();
 }
 
-// ── Escaneado IA (Claude Vision) ─────────────────────────────────────────────────
+// ── Análisis IA (Claude Vision) ───────────────────────────────────────────────
 async function analyzeInvoice(){
   const apiKey=localStorage.getItem('claude_api_key');
-  if(!apiKey){
-    alert('Primero configura tu clave API de Claude.\n\nPulsa el botón “🤖 IA” de la barra superior.');
-    return;
-  }
+  if(!apiKey){alert('Configura primero la clave de Claude en ⚙️ Config.');return;}
   if(!photoDataUrl)return;
-
-  const btnAi=document.getElementById('btn-ai');
-  const loading=document.getElementById('ai-loading');
-  const result=document.getElementById('ai-result');
-
-  btnAi.style.display='none';
-  loading.style.display='block';
-  result.style.display='none';
-
+  const btnAi=document.getElementById('btn-ai'),loading=document.getElementById('ai-loading'),result=document.getElementById('ai-result');
+  btnAi.style.display='none';loading.style.display='block';result.style.display='none';
   try{
-    const base64=photoDataUrl.split(',')[1];
-    const mediaType=photoDataUrl.startsWith('data:image/png')?'image/png':'image/jpeg';
-
+    const base64=photoDataUrl.split(',')[1],mediaType=photoDataUrl.startsWith('data:image/png')?'image/png':'image/jpeg';
     const resp=await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
-      headers:{
-        'Content-Type':'application/json',
-        'x-api-key':apiKey,
-        'anthropic-version':'2023-06-01',
-        'anthropic-dangerous-direct-browser-access':'true'
-      },
-      body:JSON.stringify({
-        model:'claude-haiku-4-5-20251001',
-        max_tokens:1024,
-        messages:[{
-          role:'user',
-          content:[
-            {type:'image',source:{type:'base64',media_type:mediaType,data:base64}},
-            {type:'text',text:`Analiza esta factura de proveedor y extrae todos los datos.
-Responde Únicamente con un objeto JSON válido (sin markdown, sin texto extra), con esta estructura exacta:
-{
-  "fecha": "YYYY-MM-DD",
-  "proveedor": "nombre exacto del proveedor o empresa emisora",
-  "lineas": [
-    {"producto": "nombre del producto", "unidad": "kg", "cantidad": 2.5, "precioUnitario": 10.50}
-  ],
-  "total": 26.25,
-  "notas": "número de factura u otras referencias"
-}
-Si no puedes leer algún campo con claridad, usa null.
-La fecha debe estar en formato YYYY-MM-DD.
-Las cantidades y precios deben ser números (no cadenas de texto).`
-          }
-          ]
-        }]
-      })
+      headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:1024,messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:mediaType,data:base64}},{type:'text',text:'Analiza esta factura y devuelve SOLO un JSON válido (sin markdown) con esta estructura:\n{"fecha":"YYYY-MM-DD","proveedor":"nombre","lineas":[{"producto":"nombre","unidad":"kg","cantidad":2.5,"precioUnitario":10.50}],"total":26.25,"notas":"nº factura"}\nSi no puedes leer un campo usa null. Cantidades y precios deben ser números.'}]}]})
     });
-
-    if(!resp.ok){
-      const err=await resp.json().catch(()=>({}));
-      const msg=err.error?.message||'Error HTTP '+resp.status;
-      if(resp.status===401)throw new Error('Clave API incorrecta. Compúeba la configuración.');
-      if(resp.status===429)throw new Error('Límite de uso alcanzado. Espera un momento.');
-      throw new Error(msg);
-    }
-
-    const data=await resp.json();
-    const text=data.content&&data.content[0]&&data.content[0].text||'';
-
-    let parsed;
-    try{
-      const match=text.match(/\{[\s\S]*\}/);
-      parsed=JSON.parse(match?match[0]:text);
-    }catch(e){
-      throw new Error('La IA no devolvió un formato válido. Inténtalo de nuevo.');
-    }
-
+    if(!resp.ok){const err=await resp.json().catch(()=>({}));throw new Error(resp.status===401?'Clave API incorrecta.':resp.status===429?'Límite de uso alcanzado.':err.error?.message||'Error '+resp.status);}
+    const data=await resp.json(),text=data.content&&data.content[0]&&data.content[0].text||'';
+    let parsed;try{const m=text.match(/\{[\s\S]*\}/);parsed=JSON.parse(m?m[0]:text);}catch(e){throw new Error('Formato inválido en la respuesta. Inténtalo de nuevo.');}
     fillFromAI(parsed);
-
-    result.className='ai-result ok';
-    result.innerHTML='✅ Datos extraídos. Revisa y completa la <strong>categoría</strong> si es necesario.';
-    result.style.display='block';
-
+    result.className='ai-result ok';result.innerHTML='✅ Datos extraídos. Revisa y selecciona la <strong>categoría</strong>.';result.style.display='block';
   }catch(e){
-    result.className='ai-result err';
-    result.innerHTML='❌ '+esc(e.message);
-    result.style.display='block';
-    btnAi.style.display='block';
-  }finally{
-    loading.style.display='none';
-  }
+    result.className='ai-result err';result.innerHTML='❌ '+esc(e.message);result.style.display='block';btnAi.style.display='block';
+  }finally{loading.style.display='none';}
 }
 
 function fillFromAI(data){
-  // Fecha
-  if(data.fecha&&/^\d{4}-\d{2}-\d{2}$/.test(data.fecha)){
-    document.getElementById('inv-date').value=data.fecha;
-  }
-
-  // Notas
+  if(data.fecha&&/^\d{4}-\d{2}-\d{2}$/.test(data.fecha))document.getElementById('inv-date').value=data.fecha;
   if(data.notas)document.getElementById('inv-notes').value=data.notas;
-
-  // Proveedor: buscar en DB o preparar como nuevo
   if(data.proveedor){
     const needle=data.proveedor.toLowerCase();
-    const existSup=DB.suppliers.find(s=>
-      s.name.toLowerCase().includes(needle)||needle.includes(s.name.toLowerCase())
-    );
-    if(existSup){
-      document.getElementById('inv-cat').value=existSup.catId;
-      onCatChange();
-      document.getElementById('inv-sup').value=existSup.id;
-      document.getElementById('new-sup-row').style.display='none';
-    }else{
-      // Preselect "new supplier" option in current category (or leave blank)
-      document.getElementById('inv-sup').value='__new__';
-      document.getElementById('new-sup-row').style.display='block';
-      document.getElementById('new-sup-name').value=data.proveedor;
-    }
+    const ex=DB.suppliers.find(s=>s.name.toLowerCase().includes(needle)||needle.includes(s.name.toLowerCase()));
+    if(ex){document.getElementById('inv-cat').value=ex.catId;onCatChange();document.getElementById('inv-sup').value=ex.id;document.getElementById('new-sup-row').style.display='none';}
+    else{document.getElementById('inv-sup').value='__new__';document.getElementById('new-sup-row').style.display='block';document.getElementById('new-sup-name').value=data.proveedor;}
   }
-
-  // Líneas
   if(data.lineas&&data.lineas.length){
     document.getElementById('invoice-lines').innerHTML='';
     data.lineas.forEach(l=>{
       if(!l.producto)return;
       addLine();
-      const rows=document.querySelectorAll('#invoice-lines .line-row');
-      const row=rows[rows.length-1];
-      const inp=row.querySelectorAll('input');
+      const rows=document.querySelectorAll('#invoice-lines .line-row'),row=rows[rows.length-1],inp=row.querySelectorAll('input');
       if(inp[0])inp[0].value=l.producto||'';
       if(inp[1])inp[1].value=l.unidad||'';
       if(inp[2])inp[2].value=l.cantidad!=null?l.cantidad:'';
@@ -972,7 +895,7 @@ function fillFromAI(data){
   }
 }
 
-// ── Modal Consumo ───────────────────────────────────────────────────────────────
+// ── Modal Consumo ────────────────────────────────────────────────────────────
 function openConsumo(pid){
   const prod=getProd(pid);
   document.getElementById('con-title').textContent='Consumo: '+prod.name;
@@ -983,11 +906,8 @@ function openConsumo(pid){
   document.getElementById('con-pid').value=pid;
   openModal('modal-consumo');
 }
-
 function saveConsumo(){
-  const pid=document.getElementById('con-pid').value;
-  const qty=parseFloat(document.getElementById('con-qty').value)||0;
-  const date=document.getElementById('con-date').value;
+  const pid=document.getElementById('con-pid').value,qty=parseFloat(document.getElementById('con-qty').value)||0,date=document.getElementById('con-date').value;
   if(qty<=0)return alert('Introduce una cantidad válida.');
   if(!date)return alert('Selecciona una fecha.');
   const prod=getProd(pid);
@@ -996,102 +916,106 @@ function saveConsumo(){
 }
 
 // ── Modal Categoría ──────────────────────────────────────────────────────────
-function openCategoriaModal(){
-  document.getElementById('cat-name').value='';
-  document.getElementById('cat-icon').value='📦';
-  document.getElementById('cat-color').value='#c8712f';
-  openModal('modal-cat');
-}
+function openCategoriaModal(){document.getElementById('cat-name').value='';document.getElementById('cat-icon').value='📦';document.getElementById('cat-color').value='#c8712f';openModal('modal-cat');}
 function saveCategoria(){
-  const name=document.getElementById('cat-name').value.trim();
-  if(!name)return alert('Escribe un nombre.');
+  const name=document.getElementById('cat-name').value.trim();if(!name)return alert('Escribe un nombre.');
   DB.categories.push({id:nid(),name,icon:document.getElementById('cat-icon').value.trim()||'📦',color:document.getElementById('cat-color').value});
   save();closeModal('modal-cat');renderGrupos();
 }
 
-// ── Configuración API ──────────────────────────────────────────────────────────
+// ── Configuración ───────────────────────────────────────────────────────────────
+let activeStab='ia';
+function switchStab(t){
+  activeStab=t;
+  document.querySelectorAll('.stab').forEach((b,i)=>b.classList.toggle('active',['ia','sync'][i]===t));
+  document.querySelectorAll('.stab-panel').forEach((p,i)=>p.classList.toggle('active',['ia','sync'][i]===t));
+}
 function openSettings(){
-  document.getElementById('settings-key').value=localStorage.getItem('claude_api_key')||'';
-  const st=document.getElementById('settings-status');
-  if(localStorage.getItem('claude_api_key')){
-    st.style.display='block';st.style.color='#2e6010';
-    st.textContent='✅ Clave configurada. La IA está lista para usar.';
+  document.getElementById('ia-key').value=localStorage.getItem('claude_api_key')||'';
+  const iaStatus=document.getElementById('ia-status');
+  iaStatus.style.display=localStorage.getItem('claude_api_key')?'block':'none';
+  const fbRaw=localStorage.getItem('fb_config');
+  document.getElementById('fb-config-input').value=fbRaw?JSON.stringify(JSON.parse(fbRaw),null,2):'';
+  // Sync status bar in settings
+  const bar=document.getElementById('sync-current-bar');
+  if(fbRaw){
+    bar.className='sync-status-bar show ok';
+    bar.innerHTML='✅ Firebase configurado — sincronización activa';
   }else{
-    st.style.display='none';
+    bar.className='sync-status-bar show warn';
+    bar.innerHTML='⚠️ Sin Firebase — los datos solo se guardan en este dispositivo';
   }
   openModal('modal-settings');
 }
 function saveSettings(){
-  const k=document.getElementById('settings-key').value.trim();
-  if(k){localStorage.setItem('claude_api_key',k);}else{localStorage.removeItem('claude_api_key');}
-  updateSettingsBtn();
+  // IA key
+  const k=document.getElementById('ia-key').value.trim();
+  if(k)localStorage.setItem('claude_api_key',k);else localStorage.removeItem('claude_api_key');
+  // Firebase config
+  const fbRaw=document.getElementById('fb-config-input').value.trim();
+  if(fbRaw){
+    try{
+      JSON.parse(fbRaw);
+      const changed=fbRaw!==localStorage.getItem('fb_config');
+      localStorage.setItem('fb_config',fbRaw);
+      if(changed){if(fbUnsub)fbUnsub();db=null;firebase.apps.forEach(app=>app.delete());initFirebase();}
+      document.getElementById('fb-status').style.display='block';
+      document.getElementById('fb-status').style.color='#2e6010';
+      document.getElementById('fb-status').textContent='✅ Firebase guardado. Conectando…';
+    }catch(e){
+      document.getElementById('fb-status').style.display='block';
+      document.getElementById('fb-status').style.color='#a32d2d';
+      document.getElementById('fb-status').textContent='❌ JSON inválido. Revisa el formato.';
+      return;
+    }
+  }else{
+    localStorage.removeItem('fb_config');
+  }
   closeModal('modal-settings');
 }
-function clearApiKey(){
-  if(!confirm('¿Eliminar la clave API guardada?'))return;
-  localStorage.removeItem('claude_api_key');
-  document.getElementById('settings-key').value='';
-  updateSettingsBtn();
+function clearFirebase(){
+  if(!confirm('¿Desconectar Firebase? Los datos quedarán solo en este dispositivo.'))return;
+  localStorage.removeItem('fb_config');
+  if(fbUnsub)fbUnsub();
+  db=null;
+  setSyncDot('off');
+  document.getElementById('fb-config-input').value='';
   closeModal('modal-settings');
-}
-function updateSettingsBtn(){
-  const btn=document.getElementById('btn-settings');
-  const hasKey=!!localStorage.getItem('claude_api_key');
-  btn.classList.toggle('configured',hasKey);
-  btn.title=hasKey?'IA configurada ✅ — Toca para cambiar':'Configurar clave API para escaneado IA';
 }
 
-// ── Ver factura ──────────────────────────────────────────────────────────────────
+// ── Ver factura ─────────────────────────────────────────────────────────────────
 function viewFactura(id){
   const inv=DB.invoices.find(i=>i.id===id);if(!inv)return;
-  const d=new Date(inv.date+'T12:00:00');
+  const d=new Date(inv.date+'T12:00:00'),cat=getCat(inv.catId),sup=getSup(inv.supId);
   document.getElementById('view-title').textContent='Factura · '+d.toLocaleDateString('es-ES',{day:'2-digit',month:'long',year:'numeric'});
-  const cat=getCat(inv.catId),sup=getSup(inv.supId);
-  const linesHtml=(inv.lines||[]).map(l=>`<tr>
-    <td>${esc(l.productName)}</td>
-    <td style="text-align:right">${l.qty} ${l.unit||''}</td>
-    <td style="text-align:right">${(l.unitPrice||0).toFixed(2)}€</td>
-    <td style="text-align:right;font-weight:600">${(l.total||0).toFixed(2)}€</td></tr>`).join('');
   document.getElementById('view-body').innerHTML=`
-    ${inv.photo?`<img src="${inv.photo}" style="max-width:100%;border-radius:8px;margin-bottom:1rem;display:block" alt="">`:''
+    ${inv.photo?`<img src="${inv.photo}" style="max-width:100%;border-radius:8px;margin-bottom:1rem;display:block" alt="">`:inv.catId?'':''
     }<div style="display:flex;gap:12px;margin-bottom:1rem;flex-wrap:wrap">
       <div style="flex:1"><div style="font-size:11px;color:#7a6e65;font-weight:600;text-transform:uppercase;margin-bottom:3px">Proveedor</div><div style="font-size:15px;font-weight:600">${esc(sup.name)}</div></div>
       <div><div style="font-size:11px;color:#7a6e65;font-weight:600;text-transform:uppercase;margin-bottom:3px">Categoría</div><div style="font-size:14px">${cat.icon} ${esc(cat.name)}</div></div>
     </div>
     <table style="width:100%;border-collapse:collapse;font-size:13px;border:1px solid #e0d8d0;border-radius:8px;overflow:hidden">
-      <thead><tr style="background:#faf7f4">
-        <th style="text-align:left;padding:7px 10px;font-size:11px;color:#7a6e65">Producto</th>
-        <th style="text-align:right;padding:7px 10px;font-size:11px;color:#7a6e65">Cantidad</th>
-        <th style="text-align:right;padding:7px 10px;font-size:11px;color:#7a6e65">Precio/ud.</th>
-        <th style="text-align:right;padding:7px 10px;font-size:11px;color:#7a6e65">Total</th></tr></thead>
-      <tbody>${linesHtml}</tbody>
-      <tfoot><tr style="background:#f5f0eb">
-        <td colspan="3" style="padding:8px 10px;font-weight:600">TOTAL</td>
-        <td style="text-align:right;padding:8px 10px;font-weight:700;font-size:17px;color:#2c1810">${fmt(inv.total)}</td></tr></tfoot>
+      <thead><tr style="background:#faf7f4"><th style="text-align:left;padding:7px 10px;font-size:11px;color:#7a6e65">Producto</th><th style="text-align:right;padding:7px 10px;font-size:11px;color:#7a6e65">Cantidad</th><th style="text-align:right;padding:7px 10px;font-size:11px;color:#7a6e65">Precio/ud.</th><th style="text-align:right;padding:7px 10px;font-size:11px;color:#7a6e65">Total</th></tr></thead>
+      <tbody>${(inv.lines||[]).map(l=>`<tr><td style="padding:7px 10px">${esc(l.productName)}</td><td style="text-align:right;padding:7px 10px">${l.qty} ${l.unit||''}</td><td style="text-align:right;padding:7px 10px">${(l.unitPrice||0).toFixed(2)}€</td><td style="text-align:right;padding:7px 10px;font-weight:600">${(l.total||0).toFixed(2)}€</td></tr>`).join('')}</tbody>
+      <tfoot><tr style="background:#f5f0eb"><td colspan="3" style="padding:8px 10px;font-weight:600">TOTAL</td><td style="text-align:right;padding:8px 10px;font-weight:700;font-size:17px;color:#2c1810">${fmt(inv.total)}</td></tr></tfoot>
     </table>
     ${inv.notes?`<div style="margin-top:.85rem;padding:.7rem;background:#f5f0eb;border-radius:7px;font-size:13px;color:#7a6e65">📝 ${esc(inv.notes)}</div>`:''}`;
   openModal('modal-view');
 }
-
 function deleteFactura(id){
   if(!confirm('¿Eliminar esta factura?'))return;
-  DB.invoices=DB.invoices.filter(i=>i.id!==id);save();
-  if(activeTab==='resumen')renderResumen();
-  else if(activeTab==='facturas')renderFacturas();
-  else renderGrupos();
+  DB.invoices=DB.invoices.filter(i=>i.id!==id);save();refreshCurrentTab();
 }
 
-// ── Modales helpers ───────────────────────────────────────────────────────────
+// ── Modales ───────────────────────────────────────────────────────────────────────
 function openModal(id){document.getElementById(id).classList.add('open');}
 function closeModal(id){document.getElementById(id).classList.remove('open');}
-document.querySelectorAll('.modal-overlay').forEach(el=>{
-  el.addEventListener('click',e=>{if(e.target===el)el.classList.remove('open');});
-});
+document.querySelectorAll('.modal-overlay').forEach(el=>el.addEventListener('click',e=>{if(e.target===el)el.classList.remove('open');}));
 
 // ── Init ─────────────────────────────────────────────────────────────────────────
-load();
+loadLocal();
 refreshDl();
-updateSettingsBtn();
+initFirebase();
 renderResumen();
 </script>
 </body>
