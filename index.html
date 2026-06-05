@@ -226,9 +226,10 @@ table.inf-tbl tr:last-child td{border-bottom:none}
 <!-- RESUMEN -->
 <div id="panel-resumen" class="panel active">
   <div class="month-nav">
-    <button onclick="changeMonth(-1)">◄</button>
+    <button onclick="changeMonth(-1)" id="btn-prev-month">◄</button>
     <span class="month-label" id="month-label"></span>
-    <button onclick="changeMonth(1)">►</button>
+    <button onclick="changeMonth(1)" id="btn-next-month">►</button>
+    <button id="btn-show-all" onclick="toggleShowAll()" style="font-size:12px;padding:4px 10px;border:1px solid #e0d8d0;background:#fff;border-radius:8px;cursor:pointer;font-family:inherit;margin-left:4px">Ver todo</button>
   </div>
   <div class="metrics" id="metrics-wrap"></div>
   <div class="section-head">
@@ -481,7 +482,7 @@ const DEF_CATS=[
 // ── Estado global ──────────────────────────────────────────────────────────────
 let DB={categories:[],suppliers:[],products:[],invoices:[],consumptions:[],_nid:1};
 let db=null, fbUnsub=null, activeTab='resumen', lineN=0, photoDataUrl=null;
-let CY=new Date().getFullYear(), CM=new Date().getMonth();
+let CY=new Date().getFullYear(), CM=new Date().getMonth(), showAll=false;
 const MN=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
 // ── IDs únicos (seguros en multi-dispositivo) ───────────────────────────────────────
@@ -578,9 +579,14 @@ function setSyncDot(state){
 
 // ── Navegación ──────────────────────────────────────────────────────────────────
 function changeMonth(d){
+  showAll=false;
   CM+=d;if(CM>11){CM=0;CY++;}if(CM<0){CM=11;CY--;}
   if(activeTab==='resumen')renderResumen();
   else if(activeTab==='informes')renderInformes();
+}
+function toggleShowAll(){
+  showAll=!showAll;
+  renderResumen();
 }
 function showTab(t){
   activeTab=t;
@@ -638,30 +644,45 @@ function refreshDl(){document.getElementById('prod-dl').innerHTML=DB.products.ma
 
 // ── Render Resumen ────────────────────────────────────────────────────────────
 function renderResumen(){
-  document.getElementById('month-label').textContent=MN[CM]+' '+CY;
-  document.getElementById('topbar-sub').textContent='Resumen de '+MN[CM]+' '+CY;
-  const invs=invsByMonth(CM,CY);
+  const btnAll=document.getElementById('btn-show-all');
+  const btnPrev=document.getElementById('btn-prev-month');
+  const btnNext=document.getElementById('btn-next-month');
+  if(showAll){
+    document.getElementById('month-label').textContent='Todos los períodos';
+    document.getElementById('topbar-sub').textContent='Resumen total';
+    btnAll.textContent='Por mes';btnAll.style.background='#2c1810';btnAll.style.color='#fff';btnAll.style.borderColor='#2c1810';
+    btnPrev.disabled=true;btnPrev.style.opacity='.3';
+    btnNext.disabled=true;btnNext.style.opacity='.3';
+  } else {
+    document.getElementById('month-label').textContent=MN[CM]+' '+CY;
+    document.getElementById('topbar-sub').textContent='Resumen de '+MN[CM]+' '+CY;
+    btnAll.textContent='Ver todo';btnAll.style.background='#fff';btnAll.style.color='#1a1208';btnAll.style.borderColor='#e0d8d0';
+    btnPrev.disabled=false;btnPrev.style.opacity='1';
+    btnNext.disabled=false;btnNext.style.opacity='1';
+  }
+  const invs=showAll?[...DB.invoices]:invsByMonth(CM,CY);
   const total=invs.reduce((s,i)=>s+(i.total||0),0);
   const pm=CM===0?11:CM-1,py=CM===0?CY-1:CY;
-  const prevTotal=invsByMonth(pm,py).reduce((s,i)=>s+(i.total||0),0);
+  const prevTotal=showAll?0:invsByMonth(pm,py).reduce((s,i)=>s+(i.total||0),0);
   const diff=prevTotal>0?((total-prevTotal)/prevTotal*100):0;
   const supSet=new Set(invs.map(i=>i.supId));
   const bycat={};
   invs.forEach(inv=>{bycat[inv.catId]=(bycat[inv.catId]||0)+(inv.total||0);});
+  const subLabel=showAll?'acumulado':prevTotal>0?(diff>=0?'▲':'▼')+Math.abs(diff).toFixed(0)+'% vs mes ant.':'Primer mes';
   document.getElementById('metrics-wrap').innerHTML=`
-    <div class="metric"><div class="metric-label">Total gastado</div><div class="metric-val">${fmt(total)}</div><div class="metric-sub">${prevTotal>0?(diff>=0?'▲':'▼')+Math.abs(diff).toFixed(0)+'% vs mes ant.':'Primer mes'}</div></div>
-    <div class="metric"><div class="metric-label">Facturas</div><div class="metric-val">${invs.length}</div><div class="metric-sub">este mes</div></div>
+    <div class="metric"><div class="metric-label">Total gastado</div><div class="metric-val">${fmt(total)}</div><div class="metric-sub">${subLabel}</div></div>
+    <div class="metric"><div class="metric-label">Facturas</div><div class="metric-val">${invs.length}</div><div class="metric-sub">${showAll?'en total':'este mes'}</div></div>
     <div class="metric"><div class="metric-label">Proveedores</div><div class="metric-val">${supSet.size}</div><div class="metric-sub">activos</div></div>
     <div class="metric"><div class="metric-label">Categorías</div><div class="metric-val">${Object.keys(bycat).length}</div><div class="metric-sub">con gasto</div></div>`;
   const sorted=Object.entries(bycat).sort((a,b)=>b[1]-a[1]);
   const maxAmt=sorted.length?sorted[0][1]:1;
-  let barsHtml=sorted.length?'':'<div style="color:#7a6e65;font-size:13px">Sin gastos registrados este mes.</div>';
+  let barsHtml=sorted.length?'':'<div style="color:#7a6e65;font-size:13px">Sin gastos registrados.</div>';
   sorted.forEach(([catId,amt])=>{
     const cat=getCat(catId),pct=Math.round(amt/maxAmt*100);
     barsHtml+=`<div class="cat-bar-row"><div class="cat-bar-icon">${cat.icon}</div><div class="cat-bar-info"><div class="cat-bar-top"><span class="cat-bar-name">${esc(cat.name)}</span><span class="cat-bar-amt">${fmt(amt)}</span></div><div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${cat.color}"></div></div></div></div>`;
   });
   document.getElementById('cat-bars').innerHTML=barsHtml;
-  buildInvTable('recent-wrap',[...DB.invoices].sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,6));
+  buildInvTable('recent-wrap',invs.sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,showAll?20:6));
 }
 
 // ── Render Facturas ──────────────────────────────────────────────────────────
