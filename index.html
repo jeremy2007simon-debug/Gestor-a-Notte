@@ -150,12 +150,26 @@ table.prod-tbl tr:last-child td{border-bottom:none}
 .ai-result.err{background:#fcebeb;color:#a32d2d;border:1px solid #f5c0c0}
 
 .lines-wrap{margin-top:.25rem}
-.lines-header{display:grid;grid-template-columns:1fr 58px 80px 88px 26px;gap:6px;font-size:10px;color:#7a6e65;font-weight:600;text-transform:uppercase;letter-spacing:.4px;padding:0 2px 4px}
-.line-row{display:grid;grid-template-columns:1fr 58px 80px 88px 26px;gap:6px;align-items:center;margin-bottom:5px}
+.lines-header{display:grid;grid-template-columns:1fr 50px 72px 82px 26px;gap:6px;font-size:10px;color:#7a6e65;font-weight:600;text-transform:uppercase;letter-spacing:.4px;padding:0 2px 4px}
+.line-row{display:flex;flex-direction:column;margin-bottom:7px;background:#fdfcfb;border:1px solid #ede8e2;border-radius:8px;padding:6px 8px}
+.line-r1{display:grid;grid-template-columns:1fr 50px 72px 82px 26px;gap:6px;align-items:center}
+.line-r2{display:flex;align-items:center;gap:6px;margin-top:5px;padding-top:4px;border-top:1px dashed #ede8e2;flex-wrap:wrap}
 .line-input{padding:6px 8px;border:1px solid #e0d8d0;border-radius:7px;font-size:12px;font-family:inherit;background:#fff;color:#1a1208;width:100%}
 .line-input:focus{outline:none;border-color:#c8712f}
 .line-del{border:none;background:none;cursor:pointer;color:#ccc;font-size:15px;padding:2px;width:26px;text-align:center;border-radius:4px}
 .line-del:hover{color:#a32d2d;background:#fcebeb}
+.extra-lbl{font-size:10px;color:#7a6e65;font-weight:600;text-transform:uppercase;white-space:nowrap;letter-spacing:.3px}
+.line-extra-num{padding:4px 6px;border:1px solid #e0d8d0;border-radius:6px;font-size:12px;font-family:inherit;background:#fff;color:#1a1208;width:60px;text-align:right}
+.line-extra-num:focus{outline:none;border-color:#c8712f}
+.dtype-btn{padding:3px 7px;border:1px solid #e0d8d0;border-radius:6px;font-size:11px;font-family:inherit;background:#fff;cursor:pointer;font-weight:500}
+.dtype-btn.eur{background:#fff8f3;border-color:#c8712f;color:#c8712f}
+.line-total-val{font-size:12px;font-weight:700;color:#2c1810;margin-left:auto;white-space:nowrap;background:#f5f0eb;padding:3px 8px;border-radius:6px}
+.backup-list{border:1px solid #e0d8d0;border-radius:8px;overflow:hidden;margin-top:.5rem}
+.backup-item{display:flex;align-items:center;justify-content:space-between;padding:.5rem .75rem;border-bottom:1px solid #f0ebe4;font-size:12px}
+.backup-item:last-child{border-bottom:none}
+.backup-item-ts{color:#7a6e65}
+.backup-item-btn{padding:3px 10px;border:1px solid #e0d8d0;background:#fff;border-radius:6px;cursor:pointer;font-size:11px;font-family:inherit}
+.backup-item-btn:hover{background:#f5f0eb}
 .inv-total-row{display:flex;justify-content:space-between;align-items:center;padding:.65rem .85rem;background:#f5f0eb;border-radius:8px;margin-top:.75rem}
 .inv-total-lbl{font-size:13px;color:#7a6e65}
 .inv-total-val{font-size:20px;font-weight:700;color:#2c1810}
@@ -190,7 +204,7 @@ table.inf-tbl tr:last-child td{border-bottom:none}
   .inv-nlines{display:none}
   .topbar{flex-direction:column;align-items:flex-start}
   .topbar-right{width:100%}
-  .lines-header,.line-row{grid-template-columns:1fr 48px 70px 78px 24px}
+  .lines-header,.line-r1{grid-template-columns:1fr 40px 62px 72px 22px}
   .modal-body{max-height:65vh}
 }
 @media print{
@@ -321,28 +335,8 @@ table.inf-tbl tr:last-child td{border-bottom:none}
         </div>
         <button class="btn-ghost" style="margin-top:7px;width:100%;font-size:12px" onclick="addLine()">+ Añadir línea</button>
       </div>
-      <div class="inv-total-row">
-        <span class="inv-total-lbl">Subtotal</span>
-        <span class="inv-total-val" id="inv-subtotal-disp">0,00€</span>
-      </div>
-      <div style="display:flex;align-items:center;gap:10px;padding:.5rem 0;border-top:1px dashed #e0d8d0;margin-top:2px">
-        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;flex:1">
-          <input type="checkbox" id="inv-igic-check" onchange="recalc()" style="width:16px;height:16px;accent-color:#c8712f">
-          <span>IGIC no incluido en precio</span>
-        </label>
-        <select id="inv-igic-pct" onchange="recalc()" style="padding:4px 8px;border:1px solid #e0d8d0;border-radius:7px;font-size:13px;font-family:inherit;background:#fff">
-          <option value="7">7%</option>
-          <option value="3">3%</option>
-          <option value="13.5">13,5%</option>
-          <option value="0">0%</option>
-        </select>
-      </div>
-      <div id="igic-row" style="display:none" class="inv-total-row" >
-        <span class="inv-total-lbl" style="color:#c8712f">IGIC</span>
-        <span class="inv-total-val" id="inv-igic-disp" style="color:#c8712f">0,00€</span>
-      </div>
-      <div class="inv-total-row" style="border-top:2px solid #2c1810;margin-top:4px;padding-top:6px">
-        <span class="inv-total-lbl" style="font-weight:700">TOTAL</span>
+      <div class="inv-total-row" style="border-top:2px solid #2c1810;margin-top:.5rem">
+        <span class="inv-total-lbl" style="font-weight:700">TOTAL FACTURA</span>
         <span class="inv-total-val" id="inv-total-disp">0,00€</span>
       </div>
       <div class="form-row" style="margin-top:.85rem">
@@ -420,6 +414,7 @@ table.inf-tbl tr:last-child td{border-bottom:none}
       <div class="stabs">
         <button class="stab active" onclick="switchStab('ia')">&#129302; Análisis IA</button>
         <button class="stab" onclick="switchStab('sync')">&#9729;&#65039; Sincronización</button>
+        <button class="stab" onclick="switchStab('backup')">&#128190; Copias</button>
       </div>
 
       <!-- Tab IA -->
@@ -436,6 +431,18 @@ table.inf-tbl tr:last-child td{border-bottom:none}
           <input type="password" id="ia-key" class="form-input" placeholder="sk-ant-api03-…" autocomplete="off">
         </div>
         <div id="ia-status" style="font-size:12px;color:#2e6010;display:none;margin-top:-.4rem;padding:.4rem .2rem">✅ Clave configurada — la IA está lista.</div>
+      </div>
+
+      <!-- Tab Backup -->
+      <div class="stab-panel" id="stab-backup">
+        <div style="display:flex;gap:8px;margin-bottom:.85rem;flex-wrap:wrap">
+          <button class="btn-primary" style="font-size:12px;padding:6px 14px" onclick="exportData()">⬇️ Exportar JSON</button>
+          <label class="btn-ghost" style="font-size:12px;padding:6px 14px;cursor:pointer">⬆️ Importar JSON<input type="file" accept=".json" onchange="importData(event)" style="display:none"></label>
+        </div>
+        <div style="font-size:12px;color:#7a6e65;margin-bottom:.5rem">Las últimas 20 copias automáticas se guardan en este dispositivo. Se crean cada vez que se guarda una factura.</div>
+        <div id="backup-list-wrap">
+          <div style="color:#7a6e65;font-size:13px">No hay copias todavía.</div>
+        </div>
       </div>
 
       <!-- Tab Sync -->
@@ -586,8 +593,71 @@ function buildSyncData(){
 }
 
 function save(){
+  saveBackup();
   saveLocal();
   pushToFirestore();
+}
+
+// ── Copias de seguridad ──────────────────────────────────────────────────────
+function saveBackup(){
+  try{
+    const prev=localStorage.getItem('cafeteria_gastos');
+    if(!prev)return;
+    const backs=JSON.parse(localStorage.getItem('cafeteria_backups')||'[]');
+    if(backs.length&&backs[0].raw===prev)return; // sin cambios, no duplicar
+    backs.unshift({ts:Date.now(),raw:prev});
+    if(backs.length>20)backs.length=20;
+    localStorage.setItem('cafeteria_backups',JSON.stringify(backs));
+  }catch(e){}
+}
+function renderBackups(){
+  const wrap=document.getElementById('backup-list-wrap');
+  const backs=JSON.parse(localStorage.getItem('cafeteria_backups')||'[]');
+  if(!backs.length){wrap.innerHTML='<div style="color:#7a6e65;font-size:13px">No hay copias todavía.</div>';return;}
+  wrap.innerHTML='<div class="backup-list">'+backs.map(b=>{
+    const d=new Date(b.ts),ds=d.toLocaleDateString('es-ES',{day:'2-digit',month:'short',year:'2-digit'})+' '+d.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+    let count='';try{const bd=JSON.parse(b.raw);count=(bd.invoices||[]).length+' facturas';}catch(e){}
+    return `<div class="backup-item"><span class="backup-item-ts">${ds} <span style="color:#2c1810;font-weight:500">${count}</span></span><button class="backup-item-btn" onclick="restoreBackup(${b.ts})">Restaurar</button></div>`;
+  }).join('')+'</div>';
+}
+function restoreBackup(ts){
+  if(!confirm('¿Restaurar esta copia? Los datos actuales se guardarán también como copia antes de restaurar.'))return;
+  const backs=JSON.parse(localStorage.getItem('cafeteria_backups')||'[]');
+  const b=backs.find(x=>x.ts===ts);
+  if(!b)return alert('Copia no encontrada.');
+  saveBackup(); // guardar estado actual antes de restaurar
+  try{
+    DB=JSON.parse(b.raw);
+    saveLocal();
+    pushToFirestore();
+    refreshCurrentTab();
+    renderBackups();
+    alert('✅ Copia restaurada correctamente.');
+  }catch(e){alert('Error al restaurar: '+e.message);}
+}
+function exportData(){
+  const data=JSON.stringify(buildSyncData(),null,2);
+  const a=document.createElement('a');
+  a.href='data:application/json;charset=utf-8,'+encodeURIComponent(data);
+  a.download='cafeteria-backup-'+new Date().toISOString().slice(0,10)+'.json';
+  a.click();
+}
+function importData(e){
+  const file=e.target.files&&e.target.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    try{
+      const imported=JSON.parse(ev.target.result);
+      if(!imported.invoices&&!imported.categories)throw new Error('Archivo no válido');
+      if(!confirm('¿Importar estos datos? Se reemplazarán los datos actuales (se guardará copia antes).'))return;
+      saveBackup();
+      DB={...DB,...imported};
+      save();refreshDl();refreshCurrentTab();
+      alert('✅ Datos importados correctamente.');
+    }catch(err){alert('Error al importar: '+err.message);}
+    e.target.value='';
+  };
+  reader.readAsText(file);
 }
 
 function setSyncDot(state){
@@ -816,11 +886,6 @@ function resetFacturaModal(){
   document.getElementById('new-sup-name').value='';
   document.getElementById('inv-notes').value='';
   document.getElementById('invoice-lines').innerHTML='';
-  document.getElementById('inv-igic-check').checked=false;
-  document.getElementById('inv-igic-pct').value='7';
-  document.getElementById('igic-row').style.display='none';
-  document.getElementById('inv-subtotal-disp').textContent='0,00€';
-  document.getElementById('inv-igic-disp').textContent='0,00€';
   document.getElementById('inv-total-disp').textContent='0,00€';
 }
 function openFacturaModal(){
@@ -843,13 +908,7 @@ function openEditFactura(id){
   document.getElementById('inv-sup').innerHTML='<option value="">-- Selecciona proveedor --</option>'+sups.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join('')+'<option value="__new__">+ Nuevo proveedor…</option>';
   document.getElementById('inv-sup').value=inv.supId;
   document.getElementById('inv-notes').value=inv.notes||'';
-  if(inv.igicPct){document.getElementById('inv-igic-check').checked=true;document.getElementById('inv-igic-pct').value=String(inv.igicPct);}
-  (inv.lines||[]).forEach(l=>{
-    lineN++;const lid='ln-'+lineN,div=document.createElement('div');
-    div.className='line-row';div.id=lid;
-    div.innerHTML=`<input list="prod-dl" class="line-input" placeholder="Nombre del producto" oninput="recalc()" value="${esc(l.productName)}"><input class="line-input" placeholder="kg" style="text-align:center" value="${esc(l.unit||'')}"><input type="number" class="line-input" placeholder="0" min="0" step="0.001" oninput="recalc()" style="text-align:right" value="${l.qty}"><input type="number" class="line-input" placeholder="0.00" min="0" step="0.01" oninput="recalc()" style="text-align:right" value="${l.unitPrice}"><button class="line-del" onclick="document.getElementById('${lid}').remove();recalc()">×</button>`;
-    document.getElementById('invoice-lines').appendChild(div);
-  });
+  (inv.lines||[]).forEach(l=>addLine(l));
   recalc();
   closeModal('modal-view');
   openModal('modal-factura');
@@ -885,23 +944,57 @@ function onCatChange(){
 }
 function onSupChange(){document.getElementById('new-sup-row').style.display=document.getElementById('inv-sup').value==='__new__'?'block':'none';}
 
-function addLine(){
+function addLine(d){
   lineN++;
   const lid='ln-'+lineN,div=document.createElement('div');
   div.className='line-row';div.id=lid;
-  div.innerHTML=`<input list="prod-dl" class="line-input" placeholder="Nombre del producto" oninput="recalc()"><input class="line-input" placeholder="kg" style="text-align:center"><input type="number" class="line-input" placeholder="0" min="0" step="0.001" oninput="recalc()" style="text-align:right"><input type="number" class="line-input" placeholder="0.00" min="0" step="0.01" oninput="recalc()" style="text-align:right"><button class="line-del" onclick="document.getElementById('${lid}').remove();recalc()">×</button>`;
+  d=d||{};
+  const dtypeIsEur=d.discountType==='eur';
+  div.innerHTML=`
+    <div class="line-r1">
+      <input data-f="name" list="prod-dl" class="line-input" placeholder="Nombre del producto" oninput="recalc()" value="${esc(d.productName||'')}">
+      <input data-f="unit" class="line-input" placeholder="kg" style="text-align:center" value="${esc(d.unit||'')}">
+      <input data-f="qty" type="number" class="line-input" placeholder="0" min="0" step="0.001" oninput="recalc()" style="text-align:right" value="${d.qty!=null?d.qty:''}">
+      <input data-f="price" type="number" class="line-input" placeholder="0.00" min="0" step="0.01" oninput="recalc()" style="text-align:right" value="${d.unitPrice!=null?d.unitPrice:''}">
+      <button class="line-del" onclick="document.getElementById('${lid}').remove();recalc()">×</button>
+    </div>
+    <div class="line-r2">
+      <span class="extra-lbl">Dto.</span>
+      <input data-f="dto" type="number" class="line-extra-num" placeholder="0" min="0" step="0.01" oninput="recalc()" value="${d.discountVal||''}">
+      <button data-dtype="${dtypeIsEur?'eur':'pct'}" class="dtype-btn${dtypeIsEur?' eur':''}" onclick="toggleDtype(this)">${dtypeIsEur?'€':'%'}</button>
+      <span class="extra-lbl" style="margin-left:6px">IGIC</span>
+      <input data-f="igic" type="number" class="line-extra-num" placeholder="—" min="0" max="100" step="0.1" oninput="recalc()" style="width:50px" value="${d.igicPct!=null?d.igicPct:''}">
+      <span class="extra-lbl">%</span>
+      <span data-f="linetotal" class="line-total-val">0,00€</span>
+    </div>`;
   document.getElementById('invoice-lines').appendChild(div);
+  if(d.qty!=null)recalc();
+}
+function toggleDtype(btn){
+  if(btn.dataset.dtype==='pct'){btn.dataset.dtype='eur';btn.textContent='€';btn.classList.add('eur');}
+  else{btn.dataset.dtype='pct';btn.textContent='%';btn.classList.remove('eur');}
+  recalc();
 }
 function recalc(){
-  let sub=0;
-  document.querySelectorAll('#invoice-lines .line-row').forEach(r=>{const ni=r.querySelectorAll('input[type=number]');sub+=(parseFloat(ni[0]&&ni[0].value||0)||0)*(parseFloat(ni[1]&&ni[1].value||0)||0);});
-  document.getElementById('inv-subtotal-disp').textContent=sub.toFixed(2).replace('.',',')+'€';
-  const igicOn=document.getElementById('inv-igic-check').checked;
-  const igicPct=parseFloat(document.getElementById('inv-igic-pct').value)||0;
-  const igicAmt=igicOn?sub*igicPct/100:0;
-  document.getElementById('igic-row').style.display=igicOn?'flex':'none';
-  document.getElementById('inv-igic-disp').textContent=igicAmt.toFixed(2).replace('.',',')+'€';
-  document.getElementById('inv-total-disp').textContent=(sub+igicAmt).toFixed(2).replace('.',',')+'€';
+  let grand=0;
+  document.querySelectorAll('#invoice-lines .line-row').forEach(r=>{
+    const qty=parseFloat((r.querySelector('[data-f=qty]')||{}).value||0)||0;
+    const price=parseFloat((r.querySelector('[data-f=price]')||{}).value||0)||0;
+    const dtoVal=parseFloat((r.querySelector('[data-f=dto]')||{}).value||0)||0;
+    const dtypeBtn=r.querySelector('[data-dtype]');
+    const dtype=dtypeBtn?dtypeBtn.dataset.dtype:'pct';
+    const igicRaw=(r.querySelector('[data-f=igic]')||{}).value;
+    const igicPct=igicRaw!==''&&igicRaw!=null?parseFloat(igicRaw):NaN;
+    const sub=qty*price;
+    const dtoAmt=dtype==='eur'?Math.min(dtoVal,sub):(sub*dtoVal/100);
+    const net=sub-dtoAmt;
+    const igicAmt=isNaN(igicPct)?0:net*igicPct/100;
+    const lineTotal=net+igicAmt;
+    const ltEl=r.querySelector('[data-f=linetotal]');
+    if(ltEl)ltEl.textContent=lineTotal.toFixed(2).replace('.',',')+'€';
+    grand+=lineTotal;
+  });
+  document.getElementById('inv-total-disp').textContent=grand.toFixed(2).replace('.',',')+'€';
 }
 
 function saveFactura(){
@@ -918,21 +1011,31 @@ function saveFactura(){
   if(!supId)return alert('Selecciona o crea un proveedor.');
   const lines=[];let total=0;
   document.querySelectorAll('#invoice-lines .line-row').forEach(r=>{
-    const inp=r.querySelectorAll('input'),name=(inp[0]&&inp[0].value||'').trim();if(!name)return;
-    const unit=(inp[1]&&inp[1].value||'').trim(),qty=parseFloat(inp[2]&&inp[2].value||0)||0,unitPrice=parseFloat(inp[3]&&inp[3].value||0)||0,lineTotal=qty*unitPrice;
+    const name=((r.querySelector('[data-f=name]')||{}).value||'').trim();if(!name)return;
+    const unit=((r.querySelector('[data-f=unit]')||{}).value||'').trim();
+    const qty=parseFloat((r.querySelector('[data-f=qty]')||{}).value||0)||0;
+    const unitPrice=parseFloat((r.querySelector('[data-f=price]')||{}).value||0)||0;
+    const dtoVal=parseFloat((r.querySelector('[data-f=dto]')||{}).value||0)||0;
+    const dtypeBtn=r.querySelector('[data-dtype]');
+    const dtype=dtypeBtn?dtypeBtn.dataset.dtype:'pct';
+    const igicRaw=((r.querySelector('[data-f=igic]')||{}).value);
+    const igicPct=igicRaw!==''&&igicRaw!=null?parseFloat(igicRaw):NaN;
+    const sub=qty*unitPrice;
+    const dtoAmt=dtype==='eur'?Math.min(dtoVal,sub):(sub*dtoVal/100);
+    const net=sub-dtoAmt;
+    const igicAmt=isNaN(igicPct)?0:net*igicPct/100;
+    const lineTotal=net+igicAmt;
     total+=lineTotal;
     let prod=DB.products.find(p=>p.name.toLowerCase()===name.toLowerCase()&&p.supId===supId);
     if(!prod){prod={id:nid(),name,supId,catId,unit};DB.products.push(prod);}
     else if(unit&&!prod.unit)prod.unit=unit;
-    lines.push({productId:prod.id,productName:name,unit,qty,unitPrice,total:lineTotal});
+    const lineObj={productId:prod.id,productName:name,unit,qty,unitPrice,subtotal:sub,total:lineTotal};
+    if(dtoVal>0){lineObj.discountVal=dtoVal;lineObj.discountType=dtype;lineObj.discountAmt=parseFloat(dtoAmt.toFixed(2));}
+    if(!isNaN(igicPct)&&igicPct>0){lineObj.igicPct=igicPct;lineObj.igicAmt=parseFloat(igicAmt.toFixed(2));}
+    lines.push(lineObj);
   });
   if(!lines.length)return alert('Añade al menos un producto.');
-  const igicOn=document.getElementById('inv-igic-check').checked;
-  const igicPct=igicOn?parseFloat(document.getElementById('inv-igic-pct').value)||0:0;
-  const igicAmt=igicOn?total*igicPct/100:0;
-  const grandTotal=total+igicAmt;
-  const invObj={date,catId,supId,lines,total:grandTotal,notes,photo:photoDataUrl,createdAt:new Date().toISOString()};
-  if(igicPct){invObj.igicPct=igicPct;invObj.igicAmt=parseFloat(igicAmt.toFixed(2));}
+  const invObj={date,catId,supId,lines,total:parseFloat(total.toFixed(2)),notes,photo:photoDataUrl,createdAt:new Date().toISOString()};
   if(editingId){
     const idx=DB.invoices.findIndex(i=>i.id===editingId);
     if(idx>=0){const old=DB.invoices[idx];invObj.id=editingId;invObj.photo=photoDataUrl||old.photo;invObj.createdAt=old.createdAt;DB.invoices[idx]=invObj;}
@@ -982,12 +1085,7 @@ function fillFromAI(data){
     document.getElementById('invoice-lines').innerHTML='';
     data.lineas.forEach(l=>{
       if(!l.producto)return;
-      addLine();
-      const rows=document.querySelectorAll('#invoice-lines .line-row'),row=rows[rows.length-1],inp=row.querySelectorAll('input');
-      if(inp[0])inp[0].value=l.producto||'';
-      if(inp[1])inp[1].value=l.unidad||'';
-      if(inp[2])inp[2].value=l.cantidad!=null?l.cantidad:'';
-      if(inp[3])inp[3].value=l.precioUnitario!=null?l.precioUnitario:'';
+      addLine({productName:l.producto,unit:l.unidad||'',qty:l.cantidad!=null?l.cantidad:null,unitPrice:l.precioUnitario!=null?l.precioUnitario:null});
     });
     recalc();
   }
@@ -1025,8 +1123,9 @@ function saveCategoria(){
 let activeStab='ia';
 function switchStab(t){
   activeStab=t;
-  document.querySelectorAll('.stab').forEach((b,i)=>b.classList.toggle('active',['ia','sync'][i]===t));
-  document.querySelectorAll('.stab-panel').forEach((p,i)=>p.classList.toggle('active',['ia','sync'][i]===t));
+  document.querySelectorAll('.stab').forEach((b,i)=>b.classList.toggle('active',['ia','sync','backup'][i]===t));
+  document.querySelectorAll('.stab-panel').forEach((p,i)=>p.classList.toggle('active',['ia','sync','backup'][i]===t));
+  if(t==='backup')renderBackups();
 }
 function openSettings(){
   document.getElementById('ia-key').value=localStorage.getItem('claude_api_key')||'';
@@ -1087,9 +1186,15 @@ function viewFactura(id){
   viewingId=id;
   const d=new Date(inv.date+'T12:00:00'),cat=getCat(inv.catId),sup=getSup(inv.supId);
   document.getElementById('view-title').textContent='Factura · '+d.toLocaleDateString('es-ES',{day:'2-digit',month:'long',year:'numeric'});
-  const sub=inv.igicAmt?(inv.total-(inv.igicAmt||0)):inv.total;
-  const igicRow=inv.igicPct?`<tr style="background:#fff8f3"><td colspan="3" style="padding:6px 10px;color:#c8712f">IGIC ${inv.igicPct}%</td><td style="text-align:right;padding:6px 10px;color:#c8712f;font-weight:600">+${(inv.igicAmt||0).toFixed(2)}€</td></tr>`:'';
-  const subRow=inv.igicPct?`<tr style="background:#faf7f4"><td colspan="3" style="padding:6px 10px;font-size:11px;color:#7a6e65">Subtotal (sin IGIC)</td><td style="text-align:right;padding:6px 10px;font-size:11px;color:#7a6e65">${sub.toFixed(2)}€</td></tr>`:'';
+  // Build per-line details
+  const lineRows=(inv.lines||[]).map(l=>{
+    let extras='';
+    if(l.discountVal>0){const dtLabel=l.discountType==='eur'?l.discountAmt.toFixed(2)+'€':`${l.discountVal}% (-${(l.discountAmt||0).toFixed(2)}€)`;extras+=`<span style="font-size:10px;color:#c8712f;margin-left:4px">Dto. ${dtLabel}</span>`;}
+    if(l.igicPct>0){extras+=`<span style="font-size:10px;color:#4a6f4a;margin-left:4px">IGIC ${l.igicPct}% (+${(l.igicAmt||0).toFixed(2)}€)</span>`;}
+    return `<tr><td style="padding:7px 10px"><div>${esc(l.productName)}${extras}</div></td><td style="text-align:right;padding:7px 10px">${l.qty} ${l.unit||''}</td><td style="text-align:right;padding:7px 10px">${(l.unitPrice||0).toFixed(2)}€</td><td style="text-align:right;padding:7px 10px;font-weight:600">${(l.total||0).toFixed(2)}€</td></tr>`;
+  }).join('');
+  // Legacy invoice-level IGIC (old format)
+  const legacyIgic=inv.igicPct&&!((inv.lines||[]).some(l=>l.igicPct>0))?`<tr style="background:#fff8f3"><td colspan="3" style="padding:6px 10px;color:#4a6f4a">IGIC ${inv.igicPct}%</td><td style="text-align:right;padding:6px 10px;color:#4a6f4a;font-weight:600">+${(inv.igicAmt||0).toFixed(2)}€</td></tr>`:'';
   document.getElementById('view-body').innerHTML=`
     ${inv.photo?`<img src="${inv.photo}" style="max-width:100%;border-radius:8px;margin-bottom:1rem;display:block" alt="">`:''
     }<div style="display:flex;gap:12px;margin-bottom:1rem;flex-wrap:wrap">
@@ -1097,9 +1202,9 @@ function viewFactura(id){
       <div><div style="font-size:11px;color:#7a6e65;font-weight:600;text-transform:uppercase;margin-bottom:3px">Categoría</div><div style="font-size:14px">${cat.icon} ${esc(cat.name)}</div></div>
     </div>
     <table style="width:100%;border-collapse:collapse;font-size:13px;border:1px solid #e0d8d0;border-radius:8px;overflow:hidden">
-      <thead><tr style="background:#faf7f4"><th style="text-align:left;padding:7px 10px;font-size:11px;color:#7a6e65">Producto</th><th style="text-align:right;padding:7px 10px;font-size:11px;color:#7a6e65">Cantidad</th><th style="text-align:right;padding:7px 10px;font-size:11px;color:#7a6e65">Precio/ud.</th><th style="text-align:right;padding:7px 10px;font-size:11px;color:#7a6e65">Total</th></tr></thead>
-      <tbody>${(inv.lines||[]).map(l=>`<tr><td style="padding:7px 10px">${esc(l.productName)}</td><td style="text-align:right;padding:7px 10px">${l.qty} ${l.unit||''}</td><td style="text-align:right;padding:7px 10px">${(l.unitPrice||0).toFixed(2)}€</td><td style="text-align:right;padding:7px 10px;font-weight:600">${(l.total||0).toFixed(2)}€</td></tr>`).join('')}</tbody>
-      <tfoot>${subRow}${igicRow}<tr style="background:#f5f0eb"><td colspan="3" style="padding:8px 10px;font-weight:600">TOTAL</td><td style="text-align:right;padding:8px 10px;font-weight:700;font-size:17px;color:#2c1810">${fmt(inv.total)}</td></tr></tfoot>
+      <thead><tr style="background:#faf7f4"><th style="text-align:left;padding:7px 10px;font-size:11px;color:#7a6e65">Producto</th><th style="text-align:right;padding:7px 10px;font-size:11px;color:#7a6e65">Cant.</th><th style="text-align:right;padding:7px 10px;font-size:11px;color:#7a6e65">P/ud.</th><th style="text-align:right;padding:7px 10px;font-size:11px;color:#7a6e65">Total</th></tr></thead>
+      <tbody>${lineRows}</tbody>
+      <tfoot>${legacyIgic}<tr style="background:#f5f0eb"><td colspan="3" style="padding:8px 10px;font-weight:600">TOTAL</td><td style="text-align:right;padding:8px 10px;font-weight:700;font-size:17px;color:#2c1810">${fmt(inv.total)}</td></tr></tfoot>
     </table>
     ${inv.notes?`<div style="margin-top:.85rem;padding:.7rem;background:#f5f0eb;border-radius:7px;font-size:13px;color:#7a6e65">📝 ${esc(inv.notes)}</div>`:''}`;
   openModal('modal-view');
