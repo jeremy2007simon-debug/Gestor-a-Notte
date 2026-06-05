@@ -15,6 +15,7 @@
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,-apple-system,sans-serif;background:#f5f0eb;color:#1a1208;min-height:100vh}
@@ -519,7 +520,7 @@ const DEF_CATS=[
 
 // ── Estado global ──────────────────────────────────────────────────────────────
 let DB={categories:[],suppliers:[],products:[],invoices:[],consumptions:[],_nid:1};
-let db=null, fbUnsub=null, activeTab='resumen', lineN=0, photoDataUrl=null, editingId=null, viewingId=null;
+let db=null, storage=null, fbUnsub=null, activeTab='resumen', lineN=0, photoDataUrl=null, editingId=null, viewingId=null;
 let CY=new Date().getFullYear(), CM=new Date().getMonth(), showAll=false;
 const MN=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
@@ -545,6 +546,7 @@ function initFirebase(){
     const cfg=JSON.parse(cfgRaw);
     if(!firebase.apps.length)firebase.initializeApp(cfg);
     db=firebase.firestore();
+    try{storage=firebase.storage();}catch(e){storage=null;}
     setSyncDot('connecting');
     startListener();
   }catch(e){
@@ -559,12 +561,12 @@ function startListener(){
     snap=>{
       if(snap.exists){
         const remote=snap.data();
-        // preserve local photos
-        const photos={};
-        (DB.invoices||[]).forEach(inv=>{if(inv.photo)photos[inv.id]=inv.photo;});
+        // preserve local base64 photos; keep remote photoUrl
+        const localPhotos={};
+        (DB.invoices||[]).forEach(inv=>{if(inv.photo)localPhotos[inv.id]=inv.photo;});
         DB={...remote};
         if(!DB._nid)DB._nid=1;
-        DB.invoices=(DB.invoices||[]).map(inv=>({...inv,photo:photos[inv.id]||null}));
+        DB.invoices=(DB.invoices||[]).map(inv=>({...inv,photo:localPhotos[inv.id]||null}));
         saveLocal();
         setSyncDot('ok');
         refreshCurrentTab();
@@ -593,7 +595,7 @@ function buildSyncData(){
     categories:DB.categories||[],
     suppliers:DB.suppliers||[],
     products:DB.products||[],
-    invoices:(DB.invoices||[]).map(({photo,...inv})=>inv), // sin fotos
+    invoices:(DB.invoices||[]).map(({photo,...inv})=>inv), // sin base64; photoUrl sí se guarda
     consumptions:DB.consumptions||[],
     _nid:DB._nid||1,
     _updated:Date.now()
@@ -1046,14 +1048,32 @@ function saveFactura(){
   const invObj={date,catId,supId,lines,total:parseFloat(total.toFixed(2)),notes,photo:photoDataUrl,createdAt:new Date().toISOString()};
   if(editingId){
     const idx=DB.invoices.findIndex(i=>i.id===editingId);
-    if(idx>=0){const old=DB.invoices[idx];invObj.id=editingId;invObj.photo=photoDataUrl||old.photo;invObj.createdAt=old.createdAt;DB.invoices[idx]=invObj;}
+    if(idx>=0){const old=DB.invoices[idx];invObj.id=editingId;invObj.photo=photoDataUrl||old.photo;invObj.photoUrl=old.photoUrl||null;invObj.createdAt=old.createdAt;DB.invoices[idx]=invObj;}
   } else {
     invObj.id=nid();
     DB.invoices.push(invObj);
   }
-  save();refreshDl();closeModal('modal-factura');
-  refreshCurrentTab();
+  const savedInv=DB.invoices.find(i=>i.id===(editingId||DB.invoices[DB.invoices.length-1].id));
+  closeModal('modal-factura');
+  save();refreshDl();refreshCurrentTab();
   if(activeTab!=='grupos')renderGrupos();
+  // Subir foto a Firebase Storage en segundo plano
+  if(photoDataUrl&&storage&&savedInv){
+    uploadInvoicePhoto(savedInv.id,photoDataUrl);
+  }
+}
+
+// ── Firebase Storage — fotos de facturas ─────────────────────────────────────
+async function uploadInvoicePhoto(invoiceId, dataUrl){
+  if(!storage||!dataUrl)return;
+  try{
+    const blob=await(await fetch(dataUrl)).blob();
+    const ref=storage.ref('facturas/'+invoiceId+'.jpg');
+    await ref.put(blob,{contentType:'image/jpeg'});
+    const url=await ref.getDownloadURL();
+    const inv=DB.invoices.find(i=>i.id===invoiceId);
+    if(inv){inv.photoUrl=url;saveLocal();pushToFirestore();}
+  }catch(e){console.warn('Storage upload:',e);}
 }
 
 // ── Análisis IA (Claude Vision) ───────────────────────────────────────────────
@@ -1204,7 +1224,7 @@ function viewFactura(id){
   // Legacy invoice-level IGIC (old format)
   const legacyIgic=inv.igicPct&&!((inv.lines||[]).some(l=>l.igicPct>0))?`<tr style="background:#fff8f3"><td colspan="3" style="padding:6px 10px;color:#4a6f4a">IGIC ${inv.igicPct}%</td><td style="text-align:right;padding:6px 10px;color:#4a6f4a;font-weight:600">+${(inv.igicAmt||0).toFixed(2)}€</td></tr>`:'';
   document.getElementById('view-body').innerHTML=`
-    ${inv.photo?`<img src="${inv.photo}" style="max-width:100%;border-radius:8px;margin-bottom:1rem;display:block" alt="">`:''
+    ${(inv.photo||inv.photoUrl)?`<img src="${inv.photo||inv.photoUrl}" style="max-width:100%;border-radius:8px;margin-bottom:1rem;display:block" alt="">`:''
     }<div style="display:flex;gap:12px;margin-bottom:1rem;flex-wrap:wrap">
       <div style="flex:1"><div style="font-size:11px;color:#7a6e65;font-weight:600;text-transform:uppercase;margin-bottom:3px">Proveedor</div><div style="font-size:15px;font-weight:600">${esc(sup.name)}</div></div>
       <div><div style="font-size:11px;color:#7a6e65;font-weight:600;text-transform:uppercase;margin-bottom:3px">Categoría</div><div style="font-size:14px">${cat.icon} ${esc(cat.name)}</div></div>
