@@ -322,7 +322,27 @@ table.inf-tbl tr:last-child td{border-bottom:none}
         <button class="btn-ghost" style="margin-top:7px;width:100%;font-size:12px" onclick="addLine()">+ Añadir línea</button>
       </div>
       <div class="inv-total-row">
-        <span class="inv-total-lbl">Total factura</span>
+        <span class="inv-total-lbl">Subtotal</span>
+        <span class="inv-total-val" id="inv-subtotal-disp">0,00€</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;padding:.5rem 0;border-top:1px dashed #e0d8d0;margin-top:2px">
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;flex:1">
+          <input type="checkbox" id="inv-igic-check" onchange="recalc()" style="width:16px;height:16px;accent-color:#c8712f">
+          <span>IGIC no incluido en precio</span>
+        </label>
+        <select id="inv-igic-pct" onchange="recalc()" style="padding:4px 8px;border:1px solid #e0d8d0;border-radius:7px;font-size:13px;font-family:inherit;background:#fff">
+          <option value="7">7%</option>
+          <option value="3">3%</option>
+          <option value="13.5">13,5%</option>
+          <option value="0">0%</option>
+        </select>
+      </div>
+      <div id="igic-row" style="display:none" class="inv-total-row" >
+        <span class="inv-total-lbl" style="color:#c8712f">IGIC</span>
+        <span class="inv-total-val" id="inv-igic-disp" style="color:#c8712f">0,00€</span>
+      </div>
+      <div class="inv-total-row" style="border-top:2px solid #2c1810;margin-top:4px;padding-top:6px">
+        <span class="inv-total-lbl" style="font-weight:700">TOTAL</span>
         <span class="inv-total-val" id="inv-total-disp">0,00€</span>
       </div>
       <div class="form-row" style="margin-top:.85rem">
@@ -460,7 +480,10 @@ table.inf-tbl tr:last-child td{border-bottom:none}
       <button class="modal-close" onclick="closeModal('modal-view')">&#10005;</button>
     </div>
     <div class="modal-body" id="view-body"></div>
-    <div class="modal-foot"><button class="btn-ghost" onclick="closeModal('modal-view')">Cerrar</button></div>
+    <div class="modal-foot">
+      <button class="btn-ghost" onclick="closeModal('modal-view')">Cerrar</button>
+      <button class="btn-accent" id="btn-edit-inv" onclick="editFacturaFromView()">✏️ Editar</button>
+    </div>
   </div>
 </div>
 
@@ -481,7 +504,7 @@ const DEF_CATS=[
 
 // ── Estado global ──────────────────────────────────────────────────────────────
 let DB={categories:[],suppliers:[],products:[],invoices:[],consumptions:[],_nid:1};
-let db=null, fbUnsub=null, activeTab='resumen', lineN=0, photoDataUrl=null;
+let db=null, fbUnsub=null, activeTab='resumen', lineN=0, photoDataUrl=null, editingId=null, viewingId=null;
 let CY=new Date().getFullYear(), CM=new Date().getMonth(), showAll=false;
 const MN=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
@@ -776,7 +799,7 @@ function renderInformes(){
 }
 
 // ── Modal Factura ──────────────────────────────────────────────────────────────
-function openFacturaModal(){
+function resetFacturaModal(){
   photoDataUrl=null;
   const prev=document.getElementById('photo-prev');
   prev.style.display='none';prev.src='';
@@ -787,16 +810,52 @@ function openFacturaModal(){
   document.getElementById('btn-ai').style.display='block';
   document.getElementById('btn-ai').disabled=false;
   document.getElementById('ai-result').style.display='none';
-  document.getElementById('inv-date').value=new Date().toISOString().slice(0,10);
   document.getElementById('inv-cat').innerHTML='<option value="">-- Selecciona --</option>'+DB.categories.map(c=>`<option value="${c.id}">${c.icon} ${esc(c.name)}</option>`).join('');
   document.getElementById('inv-sup').innerHTML='<option value="">-- Selecciona categoría primero --</option><option value="__new__">+ Nuevo proveedor…</option>';
   document.getElementById('new-sup-row').style.display='none';
   document.getElementById('new-sup-name').value='';
   document.getElementById('inv-notes').value='';
   document.getElementById('invoice-lines').innerHTML='';
+  document.getElementById('inv-igic-check').checked=false;
+  document.getElementById('inv-igic-pct').value='7';
+  document.getElementById('igic-row').style.display='none';
+  document.getElementById('inv-subtotal-disp').textContent='0,00€';
+  document.getElementById('inv-igic-disp').textContent='0,00€';
   document.getElementById('inv-total-disp').textContent='0,00€';
+}
+function openFacturaModal(){
+  editingId=null;
+  document.querySelector('#modal-factura .modal-title').textContent='🧾 Nueva Factura';
+  resetFacturaModal();
+  document.getElementById('inv-date').value=new Date().toISOString().slice(0,10);
   addLine();
   openModal('modal-factura');
+}
+function openEditFactura(id){
+  const inv=DB.invoices.find(i=>i.id===id);if(!inv)return;
+  editingId=id;
+  document.querySelector('#modal-factura .modal-title').textContent='✏️ Editar Factura';
+  resetFacturaModal();
+  document.getElementById('inv-date').value=inv.date;
+  const catSel=document.getElementById('inv-cat');
+  catSel.value=inv.catId;
+  const sups=DB.suppliers.filter(s=>s.catId===inv.catId);
+  document.getElementById('inv-sup').innerHTML='<option value="">-- Selecciona proveedor --</option>'+sups.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join('')+'<option value="__new__">+ Nuevo proveedor…</option>';
+  document.getElementById('inv-sup').value=inv.supId;
+  document.getElementById('inv-notes').value=inv.notes||'';
+  if(inv.igicPct){document.getElementById('inv-igic-check').checked=true;document.getElementById('inv-igic-pct').value=String(inv.igicPct);}
+  (inv.lines||[]).forEach(l=>{
+    lineN++;const lid='ln-'+lineN,div=document.createElement('div');
+    div.className='line-row';div.id=lid;
+    div.innerHTML=`<input list="prod-dl" class="line-input" placeholder="Nombre del producto" oninput="recalc()" value="${esc(l.productName)}"><input class="line-input" placeholder="kg" style="text-align:center" value="${esc(l.unit||'')}"><input type="number" class="line-input" placeholder="0" min="0" step="0.001" oninput="recalc()" style="text-align:right" value="${l.qty}"><input type="number" class="line-input" placeholder="0.00" min="0" step="0.01" oninput="recalc()" style="text-align:right" value="${l.unitPrice}"><button class="line-del" onclick="document.getElementById('${lid}').remove();recalc()">×</button>`;
+    document.getElementById('invoice-lines').appendChild(div);
+  });
+  recalc();
+  closeModal('modal-view');
+  openModal('modal-factura');
+}
+function editFacturaFromView(){
+  openEditFactura(viewingId);
 }
 
 function handlePhoto(e){
@@ -834,9 +893,15 @@ function addLine(){
   document.getElementById('invoice-lines').appendChild(div);
 }
 function recalc(){
-  let t=0;
-  document.querySelectorAll('#invoice-lines .line-row').forEach(r=>{const ni=r.querySelectorAll('input[type=number]');t+=(parseFloat(ni[0]&&ni[0].value||0)||0)*(parseFloat(ni[1]&&ni[1].value||0)||0);});
-  document.getElementById('inv-total-disp').textContent=t.toFixed(2).replace('.',',')+'€';
+  let sub=0;
+  document.querySelectorAll('#invoice-lines .line-row').forEach(r=>{const ni=r.querySelectorAll('input[type=number]');sub+=(parseFloat(ni[0]&&ni[0].value||0)||0)*(parseFloat(ni[1]&&ni[1].value||0)||0);});
+  document.getElementById('inv-subtotal-disp').textContent=sub.toFixed(2).replace('.',',')+'€';
+  const igicOn=document.getElementById('inv-igic-check').checked;
+  const igicPct=parseFloat(document.getElementById('inv-igic-pct').value)||0;
+  const igicAmt=igicOn?sub*igicPct/100:0;
+  document.getElementById('igic-row').style.display=igicOn?'flex':'none';
+  document.getElementById('inv-igic-disp').textContent=igicAmt.toFixed(2).replace('.',',')+'€';
+  document.getElementById('inv-total-disp').textContent=(sub+igicAmt).toFixed(2).replace('.',',')+'€';
 }
 
 function saveFactura(){
@@ -862,7 +927,19 @@ function saveFactura(){
     lines.push({productId:prod.id,productName:name,unit,qty,unitPrice,total:lineTotal});
   });
   if(!lines.length)return alert('Añade al menos un producto.');
-  DB.invoices.push({id:nid(),date,catId,supId,lines,total,notes,photo:photoDataUrl,createdAt:new Date().toISOString()});
+  const igicOn=document.getElementById('inv-igic-check').checked;
+  const igicPct=igicOn?parseFloat(document.getElementById('inv-igic-pct').value)||0:0;
+  const igicAmt=igicOn?total*igicPct/100:0;
+  const grandTotal=total+igicAmt;
+  const invObj={date,catId,supId,lines,total:grandTotal,notes,photo:photoDataUrl,createdAt:new Date().toISOString()};
+  if(igicPct){invObj.igicPct=igicPct;invObj.igicAmt=parseFloat(igicAmt.toFixed(2));}
+  if(editingId){
+    const idx=DB.invoices.findIndex(i=>i.id===editingId);
+    if(idx>=0){const old=DB.invoices[idx];invObj.id=editingId;invObj.photo=photoDataUrl||old.photo;invObj.createdAt=old.createdAt;DB.invoices[idx]=invObj;}
+  } else {
+    invObj.id=nid();
+    DB.invoices.push(invObj);
+  }
   save();refreshDl();closeModal('modal-factura');
   refreshCurrentTab();
   if(activeTab!=='grupos')renderGrupos();
@@ -1007,10 +1084,14 @@ function clearFirebase(){
 // ── Ver factura ─────────────────────────────────────────────────────────────────
 function viewFactura(id){
   const inv=DB.invoices.find(i=>i.id===id);if(!inv)return;
+  viewingId=id;
   const d=new Date(inv.date+'T12:00:00'),cat=getCat(inv.catId),sup=getSup(inv.supId);
   document.getElementById('view-title').textContent='Factura · '+d.toLocaleDateString('es-ES',{day:'2-digit',month:'long',year:'numeric'});
+  const sub=inv.igicAmt?(inv.total-(inv.igicAmt||0)):inv.total;
+  const igicRow=inv.igicPct?`<tr style="background:#fff8f3"><td colspan="3" style="padding:6px 10px;color:#c8712f">IGIC ${inv.igicPct}%</td><td style="text-align:right;padding:6px 10px;color:#c8712f;font-weight:600">+${(inv.igicAmt||0).toFixed(2)}€</td></tr>`:'';
+  const subRow=inv.igicPct?`<tr style="background:#faf7f4"><td colspan="3" style="padding:6px 10px;font-size:11px;color:#7a6e65">Subtotal (sin IGIC)</td><td style="text-align:right;padding:6px 10px;font-size:11px;color:#7a6e65">${sub.toFixed(2)}€</td></tr>`:'';
   document.getElementById('view-body').innerHTML=`
-    ${inv.photo?`<img src="${inv.photo}" style="max-width:100%;border-radius:8px;margin-bottom:1rem;display:block" alt="">`:inv.catId?'':''
+    ${inv.photo?`<img src="${inv.photo}" style="max-width:100%;border-radius:8px;margin-bottom:1rem;display:block" alt="">`:''
     }<div style="display:flex;gap:12px;margin-bottom:1rem;flex-wrap:wrap">
       <div style="flex:1"><div style="font-size:11px;color:#7a6e65;font-weight:600;text-transform:uppercase;margin-bottom:3px">Proveedor</div><div style="font-size:15px;font-weight:600">${esc(sup.name)}</div></div>
       <div><div style="font-size:11px;color:#7a6e65;font-weight:600;text-transform:uppercase;margin-bottom:3px">Categoría</div><div style="font-size:14px">${cat.icon} ${esc(cat.name)}</div></div>
@@ -1018,7 +1099,7 @@ function viewFactura(id){
     <table style="width:100%;border-collapse:collapse;font-size:13px;border:1px solid #e0d8d0;border-radius:8px;overflow:hidden">
       <thead><tr style="background:#faf7f4"><th style="text-align:left;padding:7px 10px;font-size:11px;color:#7a6e65">Producto</th><th style="text-align:right;padding:7px 10px;font-size:11px;color:#7a6e65">Cantidad</th><th style="text-align:right;padding:7px 10px;font-size:11px;color:#7a6e65">Precio/ud.</th><th style="text-align:right;padding:7px 10px;font-size:11px;color:#7a6e65">Total</th></tr></thead>
       <tbody>${(inv.lines||[]).map(l=>`<tr><td style="padding:7px 10px">${esc(l.productName)}</td><td style="text-align:right;padding:7px 10px">${l.qty} ${l.unit||''}</td><td style="text-align:right;padding:7px 10px">${(l.unitPrice||0).toFixed(2)}€</td><td style="text-align:right;padding:7px 10px;font-weight:600">${(l.total||0).toFixed(2)}€</td></tr>`).join('')}</tbody>
-      <tfoot><tr style="background:#f5f0eb"><td colspan="3" style="padding:8px 10px;font-weight:600">TOTAL</td><td style="text-align:right;padding:8px 10px;font-weight:700;font-size:17px;color:#2c1810">${fmt(inv.total)}</td></tr></tfoot>
+      <tfoot>${subRow}${igicRow}<tr style="background:#f5f0eb"><td colspan="3" style="padding:8px 10px;font-weight:600">TOTAL</td><td style="text-align:right;padding:8px 10px;font-weight:700;font-size:17px;color:#2c1810">${fmt(inv.total)}</td></tr></tfoot>
     </table>
     ${inv.notes?`<div style="margin-top:.85rem;padding:.7rem;background:#f5f0eb;border-radius:7px;font-size:13px;color:#7a6e65">📝 ${esc(inv.notes)}</div>`:''}`;
   openModal('modal-view');
