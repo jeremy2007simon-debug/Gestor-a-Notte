@@ -3,7 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Control de Gastos — Cafetería</title>
+<title>Gestor Cafetería</title>
+<meta name="description" content="Control de gastos para cafetería — facturas, categorías e informes mensuales">
+<meta name="theme-color" content="#2c1810">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Cafetería">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="icon" type="image/svg+xml" id="favicon-link">
+<link rel="apple-touch-icon" id="apple-touch-icon">
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
@@ -1218,6 +1226,88 @@ function deleteFactura(id){
 function openModal(id){document.getElementById(id).classList.add('open');}
 function closeModal(id){document.getElementById(id).classList.remove('open');}
 document.querySelectorAll('.modal-overlay').forEach(el=>el.addEventListener('click',e=>{if(e.target===el)el.classList.remove('open');}));
+
+// ── Icono de la app ──────────────────────────────────────────────────────────
+function generateAppIcons(){
+  const S=512;
+  const c=document.createElement('canvas');
+  c.width=S;c.height=S;
+  const ctx=c.getContext('2d');
+
+  // Fondo redondeado marrón oscuro
+  const r=S*0.22;
+  ctx.beginPath();
+  ctx.moveTo(r,0);ctx.lineTo(S-r,0);ctx.quadraticCurveTo(S,0,S,r);
+  ctx.lineTo(S,S-r);ctx.quadraticCurveTo(S,S,S-r,S);
+  ctx.lineTo(r,S);ctx.quadraticCurveTo(0,S,0,S-r);
+  ctx.lineTo(0,r);ctx.quadraticCurveTo(0,0,r,0);
+  ctx.closePath();
+  const grad=ctx.createLinearGradient(0,0,S,S);
+  grad.addColorStop(0,'#3d2418');grad.addColorStop(1,'#1e0f08');
+  ctx.fillStyle=grad;ctx.fill();
+
+  // Platillo
+  ctx.beginPath();
+  ctx.ellipse(S*0.46,S*0.78,S*0.28,S*0.065,0,0,Math.PI*2);
+  ctx.fillStyle='#a85a22';ctx.fill();
+
+  // Taza — cuerpo
+  ctx.beginPath();
+  const tx=S*0.18,ty=S*0.40,tw=S*0.52,th=S*0.34,tr=S*0.06;
+  ctx.moveTo(tx+tr,ty);ctx.lineTo(tx+tw-tr,ty);ctx.quadraticCurveTo(tx+tw,ty,tx+tw,ty+tr);
+  ctx.lineTo(tx+tw,ty+th-tr);ctx.quadraticCurveTo(tx+tw,ty+th,tx+tw-tr,ty+th);
+  ctx.lineTo(tx+tr,ty+th);ctx.quadraticCurveTo(tx,ty+th,tx,ty+th-tr);
+  ctx.lineTo(tx,ty+tr);ctx.quadraticCurveTo(tx,ty,tx+tr,ty);
+  ctx.closePath();
+  const cupGrad=ctx.createLinearGradient(tx,ty,tx+tw,ty+th);
+  cupGrad.addColorStop(0,'#e07830');cupGrad.addColorStop(1,'#c8712f');
+  ctx.fillStyle=cupGrad;ctx.fill();
+
+  // Asa de la taza
+  ctx.beginPath();
+  ctx.arc(S*0.74,S*0.575,S*0.11,Math.PI*-0.45,Math.PI*0.45);
+  ctx.strokeStyle='#c8712f';ctx.lineWidth=S*0.07;ctx.lineCap='round';ctx.stroke();
+
+  // Café (líquido oscuro dentro de la taza)
+  ctx.beginPath();
+  ctx.ellipse(S*0.44,S*0.445,S*0.22,S*0.05,0,0,Math.PI*2);
+  ctx.fillStyle='#3d1a08';ctx.fill();
+
+  // Vapor — 3 espirales
+  ctx.strokeStyle='rgba(245,240,235,0.75)';ctx.lineWidth=S*0.025;ctx.lineCap='round';
+  [[S*0.30,S*0.36],[S*0.44,S*0.30],[S*0.58,S*0.36]].forEach(([x,y])=>{
+    ctx.beginPath();
+    ctx.moveTo(x,y+S*0.06);
+    ctx.bezierCurveTo(x-S*0.04,y+S*0.04,x+S*0.04,y+S*0.02,x,y);
+    ctx.stroke();
+  });
+
+  // Símbolo € en blanco
+  ctx.fillStyle='#fff';ctx.font=`bold ${S*0.28}px system-ui,Arial`;
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText('€',S*0.44,S*0.585);
+
+  const png=c.toDataURL('image/png');
+
+  // SVG favicon (usa la imagen png generada)
+  const svgFav=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><image href="${png}" width="512" height="512"/></svg>`;
+  document.getElementById('favicon-link').href='data:image/svg+xml,'+encodeURIComponent(svgFav);
+  document.getElementById('apple-touch-icon').href=png;
+
+  // Web App Manifest (PWA — "Añadir a pantalla de inicio")
+  const manifest={
+    name:'Gestor Cafetería',short_name:'Cafetería',
+    start_url:'./',display:'standalone',
+    background_color:'#2c1810',theme_color:'#2c1810',
+    icons:[
+      {src:png,sizes:'512x512',type:'image/png',purpose:'any maskable'}
+    ]
+  };
+  const blob=new Blob([JSON.stringify(manifest)],{type:'application/manifest+json'});
+  const ml=document.createElement('link');ml.rel='manifest';ml.href=URL.createObjectURL(blob);
+  document.head.appendChild(ml);
+}
+generateAppIcons();
 
 // ── Init ─────────────────────────────────────────────────────────────────────────
 loadLocal();
