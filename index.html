@@ -3,10 +3,19 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Control de Gastos — Cafetería</title>
+<title>Gestor Cafetería</title>
+<meta name="description" content="Control de gastos para cafetería — facturas, categorías e informes mensuales">
+<meta name="theme-color" content="#2c1810">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Cafetería">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="icon" type="image/svg+xml" id="favicon-link">
+<link rel="apple-touch-icon" id="apple-touch-icon">
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,-apple-system,sans-serif;background:#f5f0eb;color:#1a1208;min-height:100vh}
@@ -511,7 +520,7 @@ const DEF_CATS=[
 
 // ── Estado global ──────────────────────────────────────────────────────────────
 let DB={categories:[],suppliers:[],products:[],invoices:[],consumptions:[],_nid:1};
-let db=null, fbUnsub=null, activeTab='resumen', lineN=0, photoDataUrl=null, editingId=null, viewingId=null;
+let db=null, storage=null, photoDB=null, fbUnsub=null, activeTab='resumen', lineN=0, photoDataUrl=null, editingId=null, viewingId=null;
 let CY=new Date().getFullYear(), CM=new Date().getMonth(), showAll=false;
 const MN=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
@@ -520,13 +529,49 @@ function nid(){return Date.now().toString(36)+Math.random().toString(36).slice(2
 
 // ── Persistencia local ──────────────────────────────────────────────────────────
 function saveLocal(){
-  try{localStorage.setItem('cafeteria_gastos',JSON.stringify(DB));}
-  catch(e){alert('Almacenamiento lleno. Elimina facturas con foto para liberar espacio.');}
+  try{
+    const safe={...DB,invoices:(DB.invoices||[]).map(({photo,...inv})=>inv)};
+    localStorage.setItem('cafeteria_gastos',JSON.stringify(safe));
+  }catch(e){console.error('localStorage error',e);}
 }
 function loadLocal(){
   const raw=localStorage.getItem('cafeteria_gastos');
   if(raw){try{DB=JSON.parse(raw);if(!DB._nid)DB._nid=1;}catch(e){}}
   else{DB.categories=DEF_CATS.map(c=>({...c}));saveLocal();}
+}
+
+// ── IndexedDB — almacenamiento de fotos (sin límite de espacio) ───────────────
+function initPhotoDB(){
+  return new Promise(res=>{
+    const req=indexedDB.open('cafeteria_fotos',1);
+    req.onupgradeneeded=e=>e.target.result.createObjectStore('fotos',{keyPath:'id'});
+    req.onsuccess=e=>{photoDB=e.target.result;res();};
+    req.onerror=()=>res();
+  });
+}
+function savePhoto(id,dataUrl){
+  if(!photoDB||!dataUrl)return;
+  const tx=photoDB.transaction('fotos','readwrite');
+  tx.objectStore('fotos').put({id,dataUrl});
+}
+function deletePhoto(id){
+  if(!photoDB)return;
+  const tx=photoDB.transaction('fotos','readwrite');
+  tx.objectStore('fotos').delete(id);
+}
+function loadAllPhotos(){
+  return new Promise(res=>{
+    if(!photoDB)return res();
+    const tx=photoDB.transaction('fotos','readonly');
+    const req=tx.objectStore('fotos').getAll();
+    req.onsuccess=()=>{
+      const map={};
+      (req.result||[]).forEach(r=>{map[r.id]=r.dataUrl;});
+      (DB.invoices||[]).forEach(inv=>{if(!inv.photo&&map[inv.id])inv.photo=map[inv.id];});
+      res();
+    };
+    req.onerror=()=>res();
+  });
 }
 
 // ── Firebase sync ─────────────────────────────────────────────────────────────
@@ -537,6 +582,7 @@ function initFirebase(){
     const cfg=JSON.parse(cfgRaw);
     if(!firebase.apps.length)firebase.initializeApp(cfg);
     db=firebase.firestore();
+    try{storage=firebase.storage();}catch(e){storage=null;}
     setSyncDot('connecting');
     startListener();
   }catch(e){
@@ -551,12 +597,12 @@ function startListener(){
     snap=>{
       if(snap.exists){
         const remote=snap.data();
-        // preserve local photos
-        const photos={};
-        (DB.invoices||[]).forEach(inv=>{if(inv.photo)photos[inv.id]=inv.photo;});
+        // preserve local base64 photos; keep remote photoUrl
+        const localPhotos={};
+        (DB.invoices||[]).forEach(inv=>{if(inv.photo)localPhotos[inv.id]=inv.photo;});
         DB={...remote};
         if(!DB._nid)DB._nid=1;
-        DB.invoices=(DB.invoices||[]).map(inv=>({...inv,photo:photos[inv.id]||null}));
+        DB.invoices=(DB.invoices||[]).map(inv=>({...inv,photo:localPhotos[inv.id]||null}));
         saveLocal();
         setSyncDot('ok');
         refreshCurrentTab();
@@ -585,7 +631,7 @@ function buildSyncData(){
     categories:DB.categories||[],
     suppliers:DB.suppliers||[],
     products:DB.products||[],
-    invoices:(DB.invoices||[]).map(({photo,...inv})=>inv), // sin fotos
+    invoices:(DB.invoices||[]).map(({photo,...inv})=>inv), // sin base64; photoUrl sí se guarda
     consumptions:DB.consumptions||[],
     _nid:DB._nid||1,
     _updated:Date.now()
@@ -1038,14 +1084,31 @@ function saveFactura(){
   const invObj={date,catId,supId,lines,total:parseFloat(total.toFixed(2)),notes,photo:photoDataUrl,createdAt:new Date().toISOString()};
   if(editingId){
     const idx=DB.invoices.findIndex(i=>i.id===editingId);
-    if(idx>=0){const old=DB.invoices[idx];invObj.id=editingId;invObj.photo=photoDataUrl||old.photo;invObj.createdAt=old.createdAt;DB.invoices[idx]=invObj;}
+    if(idx>=0){const old=DB.invoices[idx];invObj.id=editingId;invObj.photo=photoDataUrl||old.photo;invObj.photoUrl=old.photoUrl||null;invObj.createdAt=old.createdAt;DB.invoices[idx]=invObj;}
   } else {
     invObj.id=nid();
     DB.invoices.push(invObj);
   }
-  save();refreshDl();closeModal('modal-factura');
-  refreshCurrentTab();
+  closeModal('modal-factura');
+  save();refreshDl();refreshCurrentTab();
   if(activeTab!=='grupos')renderGrupos();
+  if(photoDataUrl){
+    savePhoto(invObj.id,photoDataUrl); // IndexedDB — sin límite
+    if(storage)uploadInvoicePhoto(invObj.id,photoDataUrl); // Firebase Storage (si configurado)
+  }
+}
+
+// ── Firebase Storage — fotos de facturas ─────────────────────────────────────
+async function uploadInvoicePhoto(invoiceId, dataUrl){
+  if(!storage||!dataUrl)return;
+  try{
+    const blob=await(await fetch(dataUrl)).blob();
+    const ref=storage.ref('facturas/'+invoiceId+'.jpg');
+    await ref.put(blob,{contentType:'image/jpeg'});
+    const url=await ref.getDownloadURL();
+    const inv=DB.invoices.find(i=>i.id===invoiceId);
+    if(inv){inv.photoUrl=url;saveLocal();pushToFirestore();}
+  }catch(e){console.warn('Storage upload:',e);}
 }
 
 // ── Análisis IA (Claude Vision) ───────────────────────────────────────────────
@@ -1196,7 +1259,7 @@ function viewFactura(id){
   // Legacy invoice-level IGIC (old format)
   const legacyIgic=inv.igicPct&&!((inv.lines||[]).some(l=>l.igicPct>0))?`<tr style="background:#fff8f3"><td colspan="3" style="padding:6px 10px;color:#4a6f4a">IGIC ${inv.igicPct}%</td><td style="text-align:right;padding:6px 10px;color:#4a6f4a;font-weight:600">+${(inv.igicAmt||0).toFixed(2)}€</td></tr>`:'';
   document.getElementById('view-body').innerHTML=`
-    ${inv.photo?`<img src="${inv.photo}" style="max-width:100%;border-radius:8px;margin-bottom:1rem;display:block" alt="">`:''
+    ${(inv.photo||inv.photoUrl)?`<img src="${inv.photo||inv.photoUrl}" style="max-width:100%;border-radius:8px;margin-bottom:1rem;display:block" alt="">`:''
     }<div style="display:flex;gap:12px;margin-bottom:1rem;flex-wrap:wrap">
       <div style="flex:1"><div style="font-size:11px;color:#7a6e65;font-weight:600;text-transform:uppercase;margin-bottom:3px">Proveedor</div><div style="font-size:15px;font-weight:600">${esc(sup.name)}</div></div>
       <div><div style="font-size:11px;color:#7a6e65;font-weight:600;text-transform:uppercase;margin-bottom:3px">Categoría</div><div style="font-size:14px">${cat.icon} ${esc(cat.name)}</div></div>
@@ -1211,7 +1274,9 @@ function viewFactura(id){
 }
 function deleteFactura(id){
   if(!confirm('¿Eliminar esta factura?'))return;
-  DB.invoices=DB.invoices.filter(i=>i.id!==id);save();refreshCurrentTab();
+  DB.invoices=DB.invoices.filter(i=>i.id!==id);
+  deletePhoto(id);
+  save();refreshCurrentTab();
 }
 
 // ── Modales ───────────────────────────────────────────────────────────────────────
@@ -1219,11 +1284,94 @@ function openModal(id){document.getElementById(id).classList.add('open');}
 function closeModal(id){document.getElementById(id).classList.remove('open');}
 document.querySelectorAll('.modal-overlay').forEach(el=>el.addEventListener('click',e=>{if(e.target===el)el.classList.remove('open');}));
 
+// ── Icono de la app ──────────────────────────────────────────────────────────
+function generateAppIcons(){
+  const S=512;
+  const c=document.createElement('canvas');
+  c.width=S;c.height=S;
+  const ctx=c.getContext('2d');
+
+  // Fondo redondeado marrón oscuro
+  const r=S*0.22;
+  ctx.beginPath();
+  ctx.moveTo(r,0);ctx.lineTo(S-r,0);ctx.quadraticCurveTo(S,0,S,r);
+  ctx.lineTo(S,S-r);ctx.quadraticCurveTo(S,S,S-r,S);
+  ctx.lineTo(r,S);ctx.quadraticCurveTo(0,S,0,S-r);
+  ctx.lineTo(0,r);ctx.quadraticCurveTo(0,0,r,0);
+  ctx.closePath();
+  const grad=ctx.createLinearGradient(0,0,S,S);
+  grad.addColorStop(0,'#3d2418');grad.addColorStop(1,'#1e0f08');
+  ctx.fillStyle=grad;ctx.fill();
+
+  // Platillo
+  ctx.beginPath();
+  ctx.ellipse(S*0.46,S*0.78,S*0.28,S*0.065,0,0,Math.PI*2);
+  ctx.fillStyle='#a85a22';ctx.fill();
+
+  // Taza — cuerpo
+  ctx.beginPath();
+  const tx=S*0.18,ty=S*0.40,tw=S*0.52,th=S*0.34,tr=S*0.06;
+  ctx.moveTo(tx+tr,ty);ctx.lineTo(tx+tw-tr,ty);ctx.quadraticCurveTo(tx+tw,ty,tx+tw,ty+tr);
+  ctx.lineTo(tx+tw,ty+th-tr);ctx.quadraticCurveTo(tx+tw,ty+th,tx+tw-tr,ty+th);
+  ctx.lineTo(tx+tr,ty+th);ctx.quadraticCurveTo(tx,ty+th,tx,ty+th-tr);
+  ctx.lineTo(tx,ty+tr);ctx.quadraticCurveTo(tx,ty,tx+tr,ty);
+  ctx.closePath();
+  const cupGrad=ctx.createLinearGradient(tx,ty,tx+tw,ty+th);
+  cupGrad.addColorStop(0,'#e07830');cupGrad.addColorStop(1,'#c8712f');
+  ctx.fillStyle=cupGrad;ctx.fill();
+
+  // Asa de la taza
+  ctx.beginPath();
+  ctx.arc(S*0.74,S*0.575,S*0.11,Math.PI*-0.45,Math.PI*0.45);
+  ctx.strokeStyle='#c8712f';ctx.lineWidth=S*0.07;ctx.lineCap='round';ctx.stroke();
+
+  // Café (líquido oscuro dentro de la taza)
+  ctx.beginPath();
+  ctx.ellipse(S*0.44,S*0.445,S*0.22,S*0.05,0,0,Math.PI*2);
+  ctx.fillStyle='#3d1a08';ctx.fill();
+
+  // Vapor — 3 espirales
+  ctx.strokeStyle='rgba(245,240,235,0.75)';ctx.lineWidth=S*0.025;ctx.lineCap='round';
+  [[S*0.30,S*0.36],[S*0.44,S*0.30],[S*0.58,S*0.36]].forEach(([x,y])=>{
+    ctx.beginPath();
+    ctx.moveTo(x,y+S*0.06);
+    ctx.bezierCurveTo(x-S*0.04,y+S*0.04,x+S*0.04,y+S*0.02,x,y);
+    ctx.stroke();
+  });
+
+  // Símbolo € en blanco
+  ctx.fillStyle='#fff';ctx.font=`bold ${S*0.28}px system-ui,Arial`;
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText('€',S*0.44,S*0.585);
+
+  const png=c.toDataURL('image/png');
+
+  // SVG favicon (usa la imagen png generada)
+  const svgFav=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><image href="${png}" width="512" height="512"/></svg>`;
+  document.getElementById('favicon-link').href='data:image/svg+xml,'+encodeURIComponent(svgFav);
+  document.getElementById('apple-touch-icon').href=png;
+
+  // Web App Manifest (PWA — "Añadir a pantalla de inicio")
+  const manifest={
+    name:'Gestor Cafetería',short_name:'Cafetería',
+    start_url:'./',display:'standalone',
+    background_color:'#2c1810',theme_color:'#2c1810',
+    icons:[
+      {src:png,sizes:'512x512',type:'image/png',purpose:'any maskable'}
+    ]
+  };
+  const blob=new Blob([JSON.stringify(manifest)],{type:'application/manifest+json'});
+  const ml=document.createElement('link');ml.rel='manifest';ml.href=URL.createObjectURL(blob);
+  document.head.appendChild(ml);
+}
+generateAppIcons();
+
 // ── Init ─────────────────────────────────────────────────────────────────────────
 loadLocal();
 refreshDl();
 initFirebase();
 renderResumen();
+initPhotoDB().then(loadAllPhotos).then(refreshCurrentTab);
 </script>
 </body>
 </html>
